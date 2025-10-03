@@ -1,0 +1,86 @@
+\documentclass[11px,a4,dvipdfmx]{jsarticle}
+% 数式
+\usepackage{amsmath,amsfonts}
+\usepackage{bm}
+\usepackage{siunitx}
+\usepackage{here}
+% 画像
+\usepackage[dvipdfmx]{graphicx}
+\usepackage[dvipdfmx]{color}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{tikz}
+\usetikzlibrary{shapes,arrows,positioning}
+%ソースコード
+\usepackage{listings} % jlisting を削除
+\lstset{
+    language=Verilog,
+    basicstyle={\ttfamily},
+    identifierstyle={\small},
+    commentstyle={\smallitshape},
+    keywordstyle={\small\bfseries},
+    ndkeywordstyle={\small},
+    stringstyle={\small\ttfamily},
+    frame={tb},
+    breaklines=true,
+    columns=[l]{fullflexible},
+    numbers=left,
+    xrightmargin=0zw,
+    xleftmargin=3zw,
+    numberstyle={\scriptsize},
+    stepnumber=1,
+    numbersep=1zw,
+    lineskip=-0.5ex,
+    language=Verilog,
+}
+\renewcommand{\lstlistingname}{コード}
+
+\begin{document}
+
+\title{計算機科学実験及演習4 画像処理 レポート}
+\author{工学部 情報学科 計算機科学コース\\学生番号: 1029358455 氏名: 登古紘平}
+\date{\today}
+\maketitle
+\newpage
+\begin{center}
+\textbf{課題内容}
+\end{center}
+MNISTの画像1枚を入力とし，3層ニューラルネットワークを用いて，0～9の値のうち1つを出力するプログラムを作成せよ．
+\begin{itemize}
+\item キーボードから0～9999の整数を入力iとして受け取り，0～9の整数を標準出力に出力すること．
+\item MNISTのテストデータ10,000枚の画像のうち$i$番目の画像を入力画像として用いる．
+\item MNISTの画像サイズ（28×28），画像枚数（10,000枚），クラス数（C =10）は既知とする．ただし，後々の改良のため変更可能な仕様にしておくことを薦める．
+\item 中間層のノード数Mは自由に決めて良い．
+\item 重み$W^{(1)},W^{(2)},b^{(1)},b^{(2)}$については乱数で決定すること．ここでは，手前の層のノード数をNとして1/Nを分散とする平均0の正規分布で与えることとする．適切な重みを設定しないため，課題1の段階では入力に対してデタラメな認識結果を返す．ただし，実行する度に同じ結果を出力するよう乱数のシードを固定すること．\\
+\end{itemize}
+\section{作成したプログラムの説明}
+このプログラムは、3層ニューラルネットワークの構築（順伝播）を模している。今回、中間層のノード数は10個とした。整数をキーボードで受け取り、その番号の画像ファイルを用いる。計算に用いた重みは、指示にあるように、乱数を用いて設定している。また、シグモイド関数及びソフトマックス関数はPython上で関数を定義して用いている。
+\section{実行結果}
+\begin{verbatim}
+tokokohei@DESKTOP-9F63DRB:~/image-processing/image-processing/all$ python assignment1.py 
+0から9999までの整数を入力してください：222
+5
+
+tokokohei@DESKTOP-9F63DRB:~/image-processing/image-processing/all$ python assignment1.py 
+0から9999までの整数を入力してください：2
+2
+
+tokokohei@DESKTOP-9F63DRB:~/image-processing/image-processing/all$ python assignment1.py 
+0から9999までの整数を入力してください：11111
+無効な数値です
+
+tokokohei@DESKTOP-9F63DRB:~/image-processing/image-processing/all$ python assignment1.py 
+0から9999までの整数を入力してください：222
+5
+\end{verbatim}
+これはターミナル上で実行した結果である。以上より、シード値が固定されており、0から9999までの数字以外は受け取っていないことが分かる。
+\section{工夫点・問題点}
+今回、コードを記述するにあたって、可読性を高めるため、関数を定義して機能をまとめるなどの工夫を行った。問題点としては、計算に用いるパラメータや数値に与える名前が少し理解しづらくなってしまった点が挙げられる。
+\section{リファクタリング}
+リファクタリングには、Gemini(2.5 Flash) を用いた。
+\begin{itemize}
+    \item プロンプト: (コード貼り付け) これは、3層ニューラルネットワークの構築（順伝播）を模している。これの変数名を変更するなど、可読性を高めろ。
+    \item 目的: コードの可読性を高めるため、また、簡潔な関数の書き方、名前の与え方の発想を得るため
+\end{itemize}
+リファクタリングの結果、数字の受付、クラスの予測、順伝播の実行など、各機能が関数として定義された。また、数字の受付に関して、try文を用いて、エラーの検出を明確に記述した。
+\end{document}
