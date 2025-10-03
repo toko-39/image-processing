@@ -1,8 +1,6 @@
 import numpy as np 
 import mnist 
-import matplotlib.pyplot as plt 
 import sys
-from pylab import cm
 
 testImages = mnist.download_and_parse_mnist_file("/mnt/c/Users/Owner/Downloads/t10k-images-idx3-ubyte.gz") 
 testLabels = mnist.download_and_parse_mnist_file("/mnt/c/Users/Owner/Downloads/t10k-labels-idx1-ubyte.gz")
