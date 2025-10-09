@@ -8,31 +8,29 @@ test_labels = mnist.download_and_parse_mnist_file("/mnt/c/Users/Owner/Downloads/
 
 # # --- ユーザー入力と前処理 ---
 # def get_input_image_vector():
-#     # ユーザーから画像番号を入力させ、対応する画像ベクトルを返す
-#     try:
-#         image_number = int(input("0~9999までの整数を入力してください："))
-#         if not (0 <= image_number <= 9999):
-#             print("無効な数値です。")
-#             sys.exit()
-        
-#         # 28x28の画像を1次元ベクトルに変換
-#         return test_images[image_number].reshape(-1)
-#     except ValueError:
-#         print("無効な入力です。整数を入力してください。")
-#         sys.exit()
+#     # ユーザーから画像番号を入力させ、対応する画像ベクトルを返す
+#     try:
+#         image_number = int(input("0~9999までの整数を入力してください："))
+#         if not (0 <= image_number <= 9999):
+#             print("無効な数値です。")
+#             sys.exit()
+ 
+#         # 28x28の画像を1次元ベクトルに変換
+#         return test_images[image_number].reshape(-1)
+#     except ValueError:
+#         print("無効な入力です。整数を入力してください。")
+#         sys.exit()
 
 def get_random_index(batch_size): #インデックスをランダムに取得
-    test_images_arrays = np.arange(len(test_images))
-    random_index = np.random.choice(test_images_arrays, size=batch_size, replace=False)
-    return random_index
+    # np.arangeの生成を省略し、直接データ数からサンプリングする
+    return np.random.choice(len(test_images), size=batch_size, replace=False)
 
-def get_batch_image_vector(random_index, batch_image_number):  #ベクトルを取得
-    batch_images = test_images[random_index]
-    return batch_images.reshape(batch_image_number, -1)
-
-def get_batch_image_label(random_index, batch_image_number): #ラベルを取得
+# 画像とラベルを別々に取得する冗長な関数を一つに統合
+def get_batch(random_index, batch_size): 
+    # ベクトルとラベルをまとめて取得
+    batch_images = test_images[random_index].reshape(batch_size, -1)
     batch_labels = test_labels[random_index]
-    return batch_labels
+    return batch_images, batch_labels
 
 def get_one_hot_label(batch_labels, output_layer_size):
     one_hot_labels = np.zeros((batch_labels.size, output_layer_size)) # ゼロで満たされた配列を作成
@@ -88,8 +86,8 @@ def forward_propagation(input_vector):
     return final_output
 
 # def get_predicted_class(output_probabilities):
-#     # 出力された確率から最も高い確率を持つクラス（予測結果）を取得
-#     return np.argmax(output_probabilities)
+#     # 出力された確率から最も高い確率を持つクラス（予測結果）を取得
+#     return np.argmax(output_probabilities)
 
 def get_cross_entropy_error(y_pred, y_true):
     
@@ -112,11 +110,8 @@ if __name__ == "__main__":
     #インデックスをランダムに取得
     random_index = get_random_index(batch_size)
     
-    #100枚のミニバッチを取り出す
-    batch_image_vector = get_batch_image_vector(random_index, batch_size)
-    
-    #対応したラベルを取り出す
-    batch_labels = get_batch_image_label(random_index, batch_size)
+    # 統合した関数を使い、ミニバッチと対応ラベルを一度に取得
+    batch_image_vector, batch_labels = get_batch(random_index, batch_size)
     
     # 順伝播を実行
     output_probabilities = forward_propagation(batch_image_vector)
@@ -128,4 +123,3 @@ if __name__ == "__main__":
     calculated_error = get_cross_entropy_error(output_probabilities, one_hot_labels)
     
     print(f"予測されたクロスエントロピー誤差は: {calculated_error} です。")
-    
