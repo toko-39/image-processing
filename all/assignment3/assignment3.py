@@ -53,13 +53,22 @@ hidden_layer_size = 100 # 中間層: 100ユニット
 output_layer_size = 10  # 出力層: 10ユニット (0-9の数字に対応)
 
 # 重みとバイアスを正規分布で初期化
-# 第1層（入力層 -> 中間層）
-weight1 = np.random.normal(loc=0.0, scale=np.sqrt(1 / input_size), size=(hidden_layer_size, input_size)) # weight1: (100, 784) 784個の入力それぞれに対する、100個の隠れ層ユニットの重み
-bias1 = np.random.normal(loc=0.0, scale=np.sqrt(1 / input_size), size=hidden_layer_size) # bias1: (100,) 100個の隠れ層ユニットのバイアス
 
-# 第2層（中間層 -> 出力層）
-weight2 = np.random.normal(loc=0.0, scale=np.sqrt(1 / hidden_layer_size), size=(output_layer_size, hidden_layer_size)) # weight2: (10, 100) 100個の隠れ層ユニットそれぞれに対する、10個の出力層ユニットの重み
-bias2 = np.random.normal(loc=0.0, scale=np.sqrt(1 / hidden_layer_size), size=output_layer_size) # bias2: (10,) 10個の出力層ユニットのバイアス
+is_load = str(input('ロードしますか？ yes or no:  '))
+if is_load == 'yes' :
+    loaded_data = np.load('assignment3_parameter.npz')
+    weight1 = loaded_data['weight1']
+    bias1 = loaded_data['bias1']
+    weight2 = loaded_data['weight2']
+    bias2 = loaded_data['bias2']
+else:
+    # 第1層（入力層 -> 中間層）
+    weight1 = np.random.normal(loc=0.0, scale=np.sqrt(1 / input_size), size=(hidden_layer_size, input_size)) # weight1: (100, 784) 784個の入力それぞれに対する、100個の隠れ層ユニットの重み
+    bias1 = np.random.normal(loc=0.0, scale=np.sqrt(1 / input_size), size=hidden_layer_size) # bias1: (100,) 100個の隠れ層ユニットのバイアス
+
+    # 第2層（中間層 -> 出力層）
+    weight2 = np.random.normal(loc=0.0, scale=np.sqrt(1 / hidden_layer_size), size=(output_layer_size, hidden_layer_size)) # weight2: (10, 100) 100個の隠れ層ユニットそれぞれに対する、10個の出力層ユニットの重み
+    bias2 = np.random.normal(loc=0.0, scale=np.sqrt(1 / hidden_layer_size), size=output_layer_size) # bias2: (10,) 10個の出力層ユニットのバイアス
 
 # --- 活性化関数と出力関数 ---
 def sigmoid(x):
@@ -169,4 +178,4 @@ if __name__ == "__main__":
         # print(f"テストデータに対する正答率は: {calculated_error} です。/n") # 正答率の計算は別途実装が必要
         # print(f"学習データに対する正答率は: {calculated_error} です。/n")
         
-    
+    np.savez('assignment3_parameter.npz', weight1 = weight1, bias1 = bias1, weight2 = weight2, bias2 = bias2)
