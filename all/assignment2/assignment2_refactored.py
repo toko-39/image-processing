@@ -46,11 +46,11 @@ hidden_layer_size = 100
 output_layer_size = 10
 
 # 重みとバイアスを正規分布で初期化
-# 第1層（入力層 -> 隠れ層）
+# 第1層（入力層 -> 中間層）
 weight1 = np.random.normal(loc=0.0, scale=np.sqrt(1 / input_size), size=(hidden_layer_size, input_size))
 bias1 = np.random.normal(loc=0.0, scale=np.sqrt(1 / input_size), size=hidden_layer_size)
 
-# 第2層（隠れ層 -> 出力層）
+# 第2層（中間層 -> 出力層）
 weight2 = np.random.normal(loc=0.0, scale=np.sqrt(1 / hidden_layer_size), size=(output_layer_size, hidden_layer_size))
 bias2 = np.random.normal(loc=0.0, scale=np.sqrt(1 / hidden_layer_size), size=output_layer_size)
 
@@ -71,10 +71,10 @@ def softmax(x):
 # --- 順伝播の実行 ---
 def forward_propagation(input_vector):
     
-    # 隠れ層の計算: 活性化関数の入力
+    # 中間層の計算: 活性化関数の入力
     hidden_layer_input = np.dot(input_vector, weight1.T) + bias1
     
-    # 隠れ層の出力: 活性化関数を適用
+    # 中間層の出力: 活性化関数を適用
     hidden_layer_output = sigmoid(hidden_layer_input)
     
     # 出力層の計算: 活性化関数の入力

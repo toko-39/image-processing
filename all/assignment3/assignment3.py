@@ -1,0 +1,172 @@
+import numpy as np 
+import mnist 
+# import sys
+
+# データの読み込み
+train_images = mnist.download_and_parse_mnist_file("/mnt/c/Users/Owner/Downloads/train-images-idx3-ubyte.gz")
+train_labels = mnist.download_and_parse_mnist_file("/mnt/c/Users/Owner/Downloads/train-labels-idx1-ubyte.gz")
+test_images = mnist.download_and_parse_mnist_file("/mnt/c/Users/Owner/Downloads/t10k-images-idx3-ubyte.gz")
+test_labels = mnist.download_and_parse_mnist_file("/mnt/c/Users/Owner/Downloads/t10k-labels-idx1-ubyte.gz")
+
+# # --- ユーザー入力と前処理 ---
+# def get_input_image_vector():
+#     # ユーザーから画像番号を入力させ、対応する画像ベクトルを返す
+#     try:
+#         image_number = int(input("0~9999までの整数を入力してください："))
+#         if not (0 <= image_number <= 9999):
+#             print("無効な数値です。")
+#             sys.exit()
+ 
+#         # 28x28の画像を1次元ベクトルに変換
+#         return train_images[image_number].reshape(-1)
+#     except ValueError:
+#         print("無効な入力です。整数を入力してください。")
+#         sys.exit()
+
+# def get_random_index(batch_size): #インデックスをランダムに取得
+#     # np.arangeの生成を省略し、直接データ数からサンプリングする
+#     return np.random.choice(len(train_images), size=batch_size, replace=False)
+
+def get_shaffled_index():
+    index = np.arange(len(train_images)) # 0から始まるインデックスの配列を作成
+    np.random.shuffle(index) # インデックスをシャッフル
+    return index
+
+# 画像とラベルを別々に取得する冗長な関数を一つに統合
+def get_batch(random_index): 
+    # ベクトルとラベルをまとめて取得
+    batch_images = train_images[random_index].reshape(len(random_index), -1) # 画像データを (バッチサイズ, 784) の2次元配列に変換
+    batch_labels = train_labels[random_index]
+    return batch_images, batch_labels
+
+def get_one_hot_label(batch_labels, output_layer_size):
+    one_hot_labels = np.zeros((batch_labels.size, output_layer_size)) # ゼロで満たされた配列を作成
+    one_hot_labels[np.arange(batch_labels.size), batch_labels] = 1 # 各行の、正解ラベルに対応するインデックスを1にする
+    return one_hot_labels
+
+
+np.random.seed(777) # シードを固定
+
+# レイヤーの次元数を定義
+input_size = train_images[0].size  # 入力層: 784 (28*28)
+hidden_layer_size = 100 # 中間層: 100ユニット
+output_layer_size = 10  # 出力層: 10ユニット (0-9の数字に対応)
+
+# 重みとバイアスを正規分布で初期化
+# 第1層（入力層 -> 中間層）
+weight1 = np.random.normal(loc=0.0, scale=np.sqrt(1 / input_size), size=(hidden_layer_size, input_size)) # weight1: (100, 784) 784個の入力それぞれに対する、100個の隠れ層ユニットの重み
+bias1 = np.random.normal(loc=0.0, scale=np.sqrt(1 / input_size), size=hidden_layer_size) # bias1: (100,) 100個の隠れ層ユニットのバイアス
+
+# 第2層（中間層 -> 出力層）
+weight2 = np.random.normal(loc=0.0, scale=np.sqrt(1 / hidden_layer_size), size=(output_layer_size, hidden_layer_size)) # weight2: (10, 100) 100個の隠れ層ユニットそれぞれに対する、10個の出力層ユニットの重み
+bias2 = np.random.normal(loc=0.0, scale=np.sqrt(1 / hidden_layer_size), size=output_layer_size) # bias2: (10,) 10個の出力層ユニットのバイアス
+
+# --- 活性化関数と出力関数 ---
+def sigmoid(x):
+    """シグモイド活性化関数"""
+    return 1 / (1 + np.exp(-x))
+
+def softmax(x):
+    """
+    ソフトマックス関数（オーバーフロー対策版）
+    各要素を0から1の間の確率に変換
+    """
+    alpha = np.max(x, axis=-1, keepdims=True)
+    exp_x = np.exp(x - alpha)
+    return exp_x / np.sum(exp_x, axis=-1, keepdims=True)
+
+# --- 順伝播の実行(重みを更新) ---
+def forward_propagation(input_vector, weight1, bias1, weight2, bias2):
+    
+    # 中間層の計算: 活性化関数の入力　 (バッチサイズ, 784) @ (784, 100) -> (バッチサイズ, 100)
+    hidden_layer_input = np.dot(input_vector, weight1.T) + bias1
+    
+    # 中間層の出力: 活性化関数を適用
+    hidden_layer_output = sigmoid(hidden_layer_input)
+    
+    # 出力層の計算: 活性化関数の入力　(バッチサイズ, 100) @ (100, 10) -> (バッチサイズ, 10)
+    output_layer_input = np.dot(hidden_layer_output, weight2.T) + bias2
+    
+    # 出力層の出力: ソフトマックスを適用して確率を算出
+    final_output = softmax(output_layer_input)
+    
+    return final_output, hidden_layer_output # hidden 追加
+
+# def get_predicted_class(output_probabilities):
+#     # 出力された確率から最も高い確率を持つクラス（予測結果）を取得
+#     return np.argmax(output_probabilities)
+
+def get_cross_entropy_error(y_pred, y_true):
+    
+    delta = 1e-7
+    
+    loss = -np.sum(y_true * np.log(y_pred + delta)) # logの中身が0にならないようにdeltaを導入
+    
+    # ミニバッチサイズBで割って平均を求める
+    batch_size = y_pred.shape[0]
+    
+    cross_entropy_error = loss / batch_size
+    
+    return cross_entropy_error
+
+# --- メイン処理 ---
+if __name__ == "__main__":
+
+    batch_size = 100
+    epoch_number = 10
+    learning_rate = 0.01
+    
+    for i in range(1, epoch_number + 1):
+        error_sum = 0
+        shaffled_index = get_shaffled_index()
+        
+        for j in range(0, len(shaffled_index), batch_size): # range(start, stop, step) を使い、batch_sizeずつインデックスをずらしながらループ
+            
+            #シャッフルしたインデックスから、先頭のbatch_size分取り出す
+            index = shaffled_index[j:j + batch_size]
+
+            # 統合した関数を使い、ミニバッチと対応ラベルを一度に取得
+            batch_image_vector, batch_labels = get_batch(index)
+
+            # 順伝播を実行
+            output_probabilities, hidden_layer_output = forward_propagation(
+                batch_image_vector, weight1, bias1, weight2, bias2
+            )
+            # one-hot labelsを取得
+            one_hot_labels = get_one_hot_label(batch_labels, output_layer_size)
+
+            
+            # クロスエントロピー誤差平均を計算
+            calculated_error = get_cross_entropy_error(output_probabilities, one_hot_labels)
+            error_sum += calculated_error
+            
+            # --- 逆伝播 ---
+            # ソフトマックス関数とクロスエントロピー誤差の合成関数の微分, 誤差(予測-正解)をバッチサイズで割ったもの (バッチサイズ, 10)
+            dEn_dak = (output_probabilities - one_hot_labels) / batch_size
+            # 中間層の出力(h_out)に対する勾配 (バッチサイズ, 10) @ (10, 100) -> (バッチサイズ, 100)
+            dEn_dX = np.dot(dEn_dak, weight2)
+            # weight2の勾配 (10, バッチサイズ) @ (バッチサイズ, 100) -> (10, 100)
+            dEn_dW_1 = np.dot(dEn_dak.T, hidden_layer_output)
+            # bias2の勾配 (バッチサイズ, 10)の行列を列ごとに合計 -> (10,) 
+            dEn_db_1 = np.sum(dEn_dak, axis = 0)
+            # 中間層の入力に対する勾配, シグモイド関数の微分の値 y*(1-y) を乗算する　(バッチサイズ, 100) * (バッチサイズ, 100) -> (バッチサイズ, 100) ... 要素ごとの積
+            dEn_dX_sig = dEn_dX * (hidden_layer_output * (1 - hidden_layer_output))
+
+            # weight1の勾配 (100, バッチサイズ) @ (バッチサイズ, 784) -> (100, 784)
+            dEn_dW_2= np.dot(dEn_dX_sig.T, batch_image_vector)
+            # bias1の勾配 (バッチサイズ, 100)の行列を列ごとに合計 -> (100,)
+            dEn_db_2 = np.sum(dEn_dX_sig, axis=0)
+
+            weight1 -= dEn_dW_2 * learning_rate 
+            bias1 -= dEn_db_2 * learning_rate
+            weight2 -= dEn_dW_1 * learning_rate 
+            bias2 -= dEn_db_1 * learning_rate
+
+        num_batches = len(train_images) // batch_size
+        # [修正] print文のバグと誤差の計算方法を修正
+        print(f"{i}エポック目")
+        print(f"  訓練データに対する平均誤差: {error_sum / num_batches}")
+        # print(f"テストデータに対する正答率は: {calculated_error} です。/n") # 正答率の計算は別途実装が必要
+        # print(f"学習データに対する正答率は: {calculated_error} です。/n")
+        
+    
