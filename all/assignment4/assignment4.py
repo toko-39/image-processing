@@ -72,9 +72,14 @@ else:
     bias2 = np.random.normal(loc=0.0, scale=np.sqrt(1 / hidden_layer_size), size=output_layer_size) # bias2: (10,) 10個の出力層ユニットのバイアス
 
 # --- 活性化関数と出力関数 ---
-def sigmoid(x):
-    """シグモイド活性化関数"""
-    return 1 / (1 + np.exp(-x))
+# def sigmoid(x):
+#     """シグモイド活性化関数"""
+#     return 1 / (1 + np.exp(-x))
+
+def ReLU(arr):
+    """課題4-1 ReLU活性化関数"""
+    new_arr = np.where(arr > 0, arr, 0)
+    return new_arr
 
 def softmax(x):
     """
@@ -92,7 +97,8 @@ def forward_propagation(input_vector, weight1, bias1, weight2, bias2):
     hidden_layer_input = np.dot(input_vector, weight1.T) + bias1
     
     # 中間層の出力: 活性化関数を適用
-    hidden_layer_output = sigmoid(hidden_layer_input)
+    # hidden_layer_output = sigmoid(hidden_layer_input)
+    hidden_layer_output = ReLU(hidden_layer_input)
     
     # 出力層の計算: 活性化関数の入力　(バッチサイズ, 100) @ (100, 10) -> (バッチサイズ, 10)
     output_layer_input = np.dot(hidden_layer_output, weight2.T) + bias2
@@ -100,7 +106,7 @@ def forward_propagation(input_vector, weight1, bias1, weight2, bias2):
     # 出力層の出力: ソフトマックスを適用して確率を算出
     final_output = softmax(output_layer_input)
     
-    return final_output, hidden_layer_output # hidden 追加
+    return final_output, hidden_layer_input, hidden_layer_output # 4-1 hidden_layer_inputを出力に追加
 
 def get_predicted_class(output_probabilities):
  # 出力された確率から最も高い確率を持つクラス（予測結果）を取得
@@ -122,9 +128,52 @@ def get_cross_entropy_error(y_pred, y_true):
     
     return cross_entropy_error
 
+def backward_propagation_and_update(batch_image_vector, hidden_layer_input, hidden_layer_output, output_probabilities, one_hot_labels, 
+                                    weight1, bias1, weight2, bias2, learning_rate):
+    """
+    逆伝播法を用いて勾配を計算し、全パラメータを更新する関数。
+    更新後のパラメータを返す。 4-1 ReLUにより、hidden_layer_inputも受け取る。
+    """
+    current_batch_size = batch_image_vector.shape[0]
+    
+    # --- 逆伝播 ---
+    dEn_dak = (output_probabilities - one_hot_labels) / current_batch_size
+    dEn_dX = np.dot(dEn_dak, weight2)
+    dEn_dW_1 = np.dot(dEn_dak.T, hidden_layer_output)
+    dEn_db_1 = np.sum(dEn_dak, axis = 0)
+    # dEn_dX_sig = dEn_dX * (hidden_layer_output * (1 - hidden_layer_output))
+    differentiated_input = np.where(hidden_layer_input > 0, 1, 0) # ReLUに入力するhidden_input_layerの微分
+    dEn_dX_sig = dEn_dX * differentiated_input
+    
+    dEn_dW_2= np.dot(dEn_dX_sig.T, batch_image_vector)
+    dEn_db_2 = np.sum(dEn_dX_sig, axis=0)
+
+    # --- パラメータ更新 ---
+    weight1 -= dEn_dW_2 * learning_rate 
+    bias1   -= dEn_db_2 * learning_rate
+    weight2 -= dEn_dW_1 * learning_rate 
+    bias2   -= dEn_db_1 * learning_rate
+    
+    return weight1, bias1, weight2, bias2
+
 def get_accuracy(y_prop, y_true): # 正答率計算
     y_pred = get_predicted_class(y_prop) # 予測結果
     accuracy = np.sum(y_pred == y_true) / len(y_prop)
+    return accuracy
+
+def calculate_accuracy(images, labels, weight1, bias1, weight2, bias2):
+    """
+    指定されたデータセットに対するモデルの正答率を計算する関数。
+    """
+    # 1. データ全体を (枚数, 784) のベクトルに変換
+    images_vector = images.reshape(len(images), -1)
+    
+    # 2. 順伝播で予測確率を計算
+    probabilities, _, _ = forward_propagation(images_vector, weight1, bias1, weight2, bias2)
+    
+    # 3. 正答率を計算
+    accuracy = get_accuracy(probabilities, labels)
+    
     return accuracy
 
 # --- メイン処理 ---
@@ -133,9 +182,7 @@ if __name__ == "__main__":
     batch_size = 100
     epoch_number = 10
     learning_rate = 0.01
-    train_loss_list = []
-    train_acc_list = []
-    test_acc_list = []
+    train_loss_list, train_acc_list, test_acc_list = [], [], []
     
     for i in range(1, epoch_number + 1):
         error_sum = 0
@@ -149,8 +196,8 @@ if __name__ == "__main__":
             # 統合した関数を使い、ミニバッチと対応ラベルを一度に取得
             batch_image_vector, batch_labels = get_batch(index)
 
-            # 順伝播を実行
-            output_probabilities, hidden_layer_output = forward_propagation(
+            # 順伝播を実行 4-1 hidden_layer_inputを出力し、ReLUに使用
+            output_probabilities, hidden_layer_input, hidden_layer_output = forward_propagation(
                 batch_image_vector, weight1, bias1, weight2, bias2
             )
             # one-hot labelsを取得
@@ -162,39 +209,17 @@ if __name__ == "__main__":
             error_sum += calculated_error
             
             # --- 逆伝播 ---
-            # ソフトマックス関数とクロスエントロピー誤差の合成関数の微分, 誤差(予測-正解)をバッチサイズで割ったもの (バッチサイズ, 10)
-            dEn_dak = (output_probabilities - one_hot_labels) / batch_size
-            # 中間層の出力(h_out)に対する勾配 (バッチサイズ, 10) @ (10, 100) -> (バッチサイズ, 100)
-            dEn_dX = np.dot(dEn_dak, weight2)
-            # weight2の勾配 (10, バッチサイズ) @ (バッチサイズ, 100) -> (10, 100)
-            dEn_dW_1 = np.dot(dEn_dak.T, hidden_layer_output)
-            # bias2の勾配 (バッチサイズ, 10)の行列を列ごとに合計 -> (10,) 
-            dEn_db_1 = np.sum(dEn_dak, axis = 0)
-            # 中間層の入力に対する勾配, シグモイド関数の微分の値 y*(1-y) を乗算する　(バッチサイズ, 100) * (バッチサイズ, 100) -> (バッチサイズ, 100) ... 要素ごとの積
-            dEn_dX_sig = dEn_dX * (hidden_layer_output * (1 - hidden_layer_output))
+            weight1, bias1, weight2, bias2 = backward_propagation_and_update(
+                batch_image_vector, hidden_layer_input, hidden_layer_output, output_probabilities, one_hot_labels,
+                weight1, bias1, weight2, bias2, learning_rate
+            )
 
-            # weight1の勾配 (100, バッチサイズ) @ (バッチサイズ, 784) -> (100, 784)
-            dEn_dW_2= np.dot(dEn_dX_sig.T, batch_image_vector)
-            # bias1の勾配 (バッチサイズ, 100)の行列を列ごとに合計 -> (100,)
-            dEn_db_2 = np.sum(dEn_dX_sig, axis=0)
-
-            weight1 -= dEn_dW_2 * learning_rate 
-            bias1 -= dEn_db_2 * learning_rate
-            weight2 -= dEn_dW_1 * learning_rate 
-            bias2 -= dEn_db_1 * learning_rate
-
+        train_accuracy = calculate_accuracy(train_images, train_labels, weight1, bias1, weight2, bias2)
+        test_accuracy = calculate_accuracy(test_images, test_labels, weight1, bias1, weight2, bias2)
+        
         num_batches = len(train_images) // batch_size
-        
         train_loss_list.append(error_sum / num_batches)
-        
-        train_images_vector = train_images.reshape(len(train_images), -1)
-        train_prob, _ = forward_propagation(train_images_vector, weight1, bias1, weight2, bias2)
-        train_accuracy = get_accuracy(train_prob, train_labels)
         train_acc_list.append(train_accuracy)
-        
-        test_images_vector = test_images.reshape(len(test_images), -1)
-        test_prob, _ = forward_propagation(test_images_vector, weight1, bias1, weight2, bias2)
-        test_accuracy = get_accuracy(test_prob, test_labels)
         test_acc_list.append(test_accuracy)
         print(f"{i}エポック目")
         print(f"  平均クロスエントロピー誤差: {error_sum / num_batches}")

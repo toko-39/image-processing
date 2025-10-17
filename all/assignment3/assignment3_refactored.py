@@ -64,11 +64,11 @@ if is_load == 'yes' :
     bias2 = loaded_data['bias2']
 else:
     # 第1層（入力層 -> 中間層）
-    weight1 = np.random.normal(loc=0.0, scale=np.sqrt(1 / input_size), size=(hidden_layer_size, input_size)) # weight1: (100, 784) 784個の入力それぞれに対する、100個の隠れ層ユニットの重み
-    bias1 = np.random.normal(loc=0.0, scale=np.sqrt(1 / input_size), size=hidden_layer_size) # bias1: (100,) 100個の隠れ層ユニットのバイアス
+    weight1 = np.random.normal(loc=0.0, scale=np.sqrt(1 / input_size), size=(hidden_layer_size, input_size)) # weight1: (100, 784) 784個の入力それぞれに対する、100個の中間層ユニットの重み
+    bias1 = np.random.normal(loc=0.0, scale=np.sqrt(1 / input_size), size=hidden_layer_size) # bias1: (100,) 100個の中間層ユニットのバイアス
 
     # 第2層（中間層 -> 出力層）
-    weight2 = np.random.normal(loc=0.0, scale=np.sqrt(1 / hidden_layer_size), size=(output_layer_size, hidden_layer_size)) # weight2: (10, 100) 100個の隠れ層ユニットそれぞれに対する、10個の出力層ユニットの重み
+    weight2 = np.random.normal(loc=0.0, scale=np.sqrt(1 / hidden_layer_size), size=(output_layer_size, hidden_layer_size)) # weight2: (10, 100) 100個の中間層ユニットそれぞれに対する、10個の出力層ユニットの重み
     bias2 = np.random.normal(loc=0.0, scale=np.sqrt(1 / hidden_layer_size), size=output_layer_size) # bias2: (10,) 10個の出力層ユニットのバイアス
 
 # --- 活性化関数と出力関数 ---
