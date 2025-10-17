@@ -1,5 +1,6 @@
 import numpy as np 
 import mnist 
+import matplotlib.pyplot as plt
 # import sys
 
 # データの読み込み
@@ -101,9 +102,12 @@ def forward_propagation(input_vector, weight1, bias1, weight2, bias2):
     
     return final_output, hidden_layer_output # hidden 追加
 
-# def get_predicted_class(output_probabilities):
-#     # 出力された確率から最も高い確率を持つクラス（予測結果）を取得
-#     return np.argmax(output_probabilities)
+def get_predicted_class(output_probabilities):
+ # 出力された確率から最も高い確率を持つクラス（予測結果）を取得
+    if output_probabilities.ndim == 1:
+        return np.argmax(output_probabilities)
+    else:
+        return np.argmax(output_probabilities, axis=1)
 
 def get_cross_entropy_error(y_pred, y_true):
     
@@ -118,12 +122,20 @@ def get_cross_entropy_error(y_pred, y_true):
     
     return cross_entropy_error
 
+def get_accuracy(y_prop, y_true): # 正答率計算
+    y_pred = get_predicted_class(y_prop) # 予測結果
+    accuracy = np.sum(y_pred == y_true) / len(y_prop)
+    return accuracy
+
 # --- メイン処理 ---
 if __name__ == "__main__":
 
     batch_size = 100
     epoch_number = 10
     learning_rate = 0.01
+    train_loss_list = []
+    train_acc_list = []
+    test_acc_list = []
     
     for i in range(1, epoch_number + 1):
         error_sum = 0
@@ -172,10 +184,46 @@ if __name__ == "__main__":
             bias2 -= dEn_db_1 * learning_rate
 
         num_batches = len(train_images) // batch_size
-        # [修正] print文のバグと誤差の計算方法を修正
-        print(f"{i}エポック目")
-        print(f"  訓練データに対する平均誤差: {error_sum / num_batches}")
-        # print(f"テストデータに対する正答率は: {calculated_error} です。/n") # 正答率の計算は別途実装が必要
-        # print(f"学習データに対する正答率は: {calculated_error} です。/n")
         
+        train_loss_list.append(error_sum / num_batches)
+        
+        train_images_vector = train_images.reshape(len(train_images), -1)
+        train_prob, _ = forward_propagation(train_images_vector, weight1, bias1, weight2, bias2)
+        train_accuracy = get_accuracy(train_prob, train_labels)
+        train_acc_list.append(train_accuracy)
+        
+        test_images_vector = test_images.reshape(len(test_images), -1)
+        test_prob, _ = forward_propagation(test_images_vector, weight1, bias1, weight2, bias2)
+        test_accuracy = get_accuracy(test_prob, test_labels)
+        test_acc_list.append(test_accuracy)
+        print(f"{i}エポック目")
+        print(f"  平均クロスエントロピー誤差: {error_sum / num_batches}")
+        print(f"  テストデータに対する正答率: {test_accuracy}") 
+        print(f"  学習データに対する正答率: {train_accuracy}")
+        
+    # --- グラフの描画 ---
+    x = np.arange(1, epoch_number + 1)
+    plt.figure(figsize=(12, 5))
+
+    # 誤差のグラフ
+    plt.subplot(1, 2, 1)
+    plt.plot(x, train_loss_list, marker='o')
+    plt.title('Training Loss')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.grid(True)
+
+    # 正答率のグラフ
+    plt.subplot(1, 2, 2)
+    plt.plot(x, train_acc_list, marker='o', label='Train Accuracy')
+    plt.plot(x, test_acc_list, marker='s', label='Test Accuracy')
+    plt.title('Accuracy')
+    plt.xlabel('Epoch')
+    plt.ylabel('Accuracy')
+    plt.ylim(0, 1.0)
+    plt.grid(True)
+    plt.legend()
+
+    plt.tight_layout()
+    plt.show()
     np.savez('assignment3_parameter.npz', weight1 = weight1, bias1 = bias1, weight2 = weight2, bias2 = bias2)
