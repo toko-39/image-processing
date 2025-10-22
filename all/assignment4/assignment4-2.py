@@ -1,13 +1,15 @@
 import numpy as np 
 import mnist 
 import matplotlib.pyplot as plt
+import gzip
 # import sys
 
-# データの読み込み
-train_images = mnist.download_and_parse_mnist_file("/mnt/c/Users/Owner/Downloads/train-images-idx3-ubyte.gz")
-train_labels = mnist.download_and_parse_mnist_file("/mnt/c/Users/Owner/Downloads/train-labels-idx1-ubyte.gz")
-test_images = mnist.download_and_parse_mnist_file("/mnt/c/Users/Owner/Downloads/t10k-images-idx3-ubyte.gz")
-test_labels = mnist.download_and_parse_mnist_file("/mnt/c/Users/Owner/Downloads/t10k-labels-idx1-ubyte.gz")
+# ローカルMNISTデータの読み込み
+train_images = mnist.parse_idx(gzip.open("all/mnist_data/train-images-idx3-ubyte.gz", "rb"))
+train_labels = mnist.parse_idx(gzip.open("all/mnist_data/train-labels-idx1-ubyte.gz", "rb"))
+test_images  = mnist.parse_idx(gzip.open("all/mnist_data/t10k-images-idx3-ubyte.gz", "rb"))
+test_labels  = mnist.parse_idx(gzip.open("all/mnist_data/t10k-labels-idx1-ubyte.gz", "rb"))
+
 
 # # --- ユーザー入力と前処理 ---
 # def get_input_image_vector():
@@ -25,7 +27,7 @@ test_labels = mnist.download_and_parse_mnist_file("/mnt/c/Users/Owner/Downloads/
 #         sys.exit()
 
 # def get_random_index(batch_size): #インデックスをランダムに取得
-#     # np.arangeの生成を省略し、直接データ数からサンプリングする
+#     # np.arrangeの生成を省略し、直接データ数からサンプリングする
 #     return np.random.choice(len(train_images), size=batch_size, replace=False)
 
 def get_shaffled_index(arr):
@@ -254,4 +256,3 @@ if __name__ == "__main__":
     plt.tight_layout()
     plt.show()
     np.savez('assignment3_parameter.npz', weight1 = weight1, bias1 = bias1, weight2 = weight2, bias2 = bias2)
-    # 
