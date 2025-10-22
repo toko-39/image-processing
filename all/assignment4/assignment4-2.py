@@ -254,3 +254,4 @@ if __name__ == "__main__":
     plt.tight_layout()
     plt.show()
     np.savez('assignment3_parameter.npz', weight1 = weight1, bias1 = bias1, weight2 = weight2, bias2 = bias2)
+    # 
