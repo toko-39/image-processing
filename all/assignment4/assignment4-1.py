@@ -47,7 +47,7 @@ def get_one_hot_label(batch_labels, output_layer_size):
     return one_hot_labels
 
 
-np.random.seed(777) # シードを固定
+np.random.seed(77) # シードを固定
 
 # レイヤーの次元数を定義
 input_size = train_images[0].size  # 入力層: 784 (28*28)
