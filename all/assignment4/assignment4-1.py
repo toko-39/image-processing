@@ -187,6 +187,7 @@ if __name__ == "__main__":
     
     for i in range(1, epoch_number + 1):
         error_sum = 0
+        train_accuracy_sum = 0
         shaffled_index = get_shaffled_index()
         
         for j in range(0, len(shaffled_index), batch_size): # range(start, stop, step) を使い、batch_sizeずつインデックスをずらしながらループ
@@ -215,17 +216,17 @@ if __name__ == "__main__":
                 weight1, bias1, weight2, bias2, learning_rate
             )
 
-        train_accuracy = calculate_accuracy(train_images, train_labels, weight1, bias1, weight2, bias2)
+            train_accuracy_sum += calculate_accuracy(train_images, train_labels, weight1, bias1, weight2, bias2)
         test_accuracy = calculate_accuracy(test_images, test_labels, weight1, bias1, weight2, bias2)
         
         num_batches = len(train_images) // batch_size
         train_loss_list.append(error_sum / num_batches)
-        train_acc_list.append(train_accuracy)
+        train_acc_list.append(train_accuracy_sum / num_batches)
         test_acc_list.append(test_accuracy)
         print(f"{i}エポック目")
         print(f"  平均クロスエントロピー誤差: {error_sum / num_batches}")
         print(f"  テストデータに対する正答率: {test_accuracy}") 
-        print(f"  学習データに対する正答率: {train_accuracy}")
+        print(f"  学習データに対する正答率: {train_accuracy_sum / num_batches}")
         
     # --- グラフの描画 ---
     x = np.arange(1, epoch_number + 1)

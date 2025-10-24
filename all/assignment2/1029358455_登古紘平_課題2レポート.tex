@@ -61,11 +61,35 @@
 \section{作成したプログラムの説明}
 このプログラムは、クロスエントロピー誤差の平均を計算するプログラムである。課題1でリファクタリングを行った後のコードをベースに実装した。クロスエントロピー誤差平均の計算に必要な情報は、バッチサイズ、one-hot vector表記の正解ラベル、および出力層における各要素の出力である。課題1の時点で順伝播は実装済みであるため、本課題では新たに以下の関数を実装した。
 \begin{itemize}
-    \item \verb|get_random_index|: インデックスをランダムに取得
-    \item \verb|get_batch_image_vector|: ベクトルを取得
-    \item \verb|get_batch_image_label|: 対応するラベルを取得
-    \item \verb|get_one_hot_label|: 正解ラベルをone-hot vectorに変換
-    \item \verb|get_cross_entropy_error|: クロスエントロピー誤差平均を計算
+    \item \verb|get_random_index|: インデックスをランダムに取得\\
+    def get\_random\_index(batch\_size):\\
+    test\_images\_arrays = np.arange(len(test\_images))\\
+    random\_index = np.random.choice(test\_images\_arrays, size=batch\_size, replace=False)\\
+    return random\_index\\
+    \item \verb|get_batch_image_vector|: ベクトルを取得\\
+    def get\_batch\_image\_vector(random\_index, batch\_image\_number): \\
+    batch\_images = test\_images[random\_index]\\
+    return batch\_images.reshape(batch\_image\_number, -1)\\
+    \item \verb|get_batch_image_label|: 対応するラベルを取得\\
+    def get\_batch\_image\_label(random\_index, batch\_image\_number):\\
+    batch\_labels = test\_labels[random\_index]\\
+    return batch\_labels\\
+    \item \verb|get_one_hot_label|: 正解ラベルをone-hot vectorに変換\\
+    def get\_one\_hot\_label(batch\_labels, output\_layer\_size):\\
+    \# ゼロで満たされた配列を作成\\
+    one\_hot\_labels = np.zeros((batch\_labels.size, output\_layer\_size)) \\
+    \# 各行の、正解ラベルに対応するインデックスを1にする\\
+    one\_hot\_labels[np.arange(batch\_labels.size), batch\_labels] = 1 \\
+    return one\_hot\_labels\\
+    \item \verb|get_cross_entropy_error|: クロスエントロピー誤差平均を計算\\
+    def get\_cross\_entropy\_error(y\_pred, y\_true):\\
+    \# logの中身が0にならないようにdeltaを導入\\
+    delta = 1e-7\\
+    loss = -np.sum(y\_true * np.log(y\_pred + delta)) \\
+    \# ミニバッチサイズBで割って平均を求める\\
+    batch\_size = y\_pred.shape[0]\\
+    cross\_entropy\_error = loss / batch\_size\\
+    return cross\_entropy\_error\\
 \end{itemize}
 課題1では中間層のユニット数を10個にしていたが、誤差が大きかったため100個に変更した。また、今回はバッチサイズ分の画像100枚を多次元ベクトルとして一括で計算した。
 
