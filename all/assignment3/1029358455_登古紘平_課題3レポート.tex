@@ -61,8 +61,8 @@
 \section{作成したプログラムの説明}
 このプログラムは、誤差逆伝播法による3層ニューラルネットワークの学習を実装したものである。今回は新たに以下の二つの関数を実装した。
 \begin{itemize}
-    \item get\_shaffled\_index : 学習データ分の長さの、0から始まるインデックスの配列を生成し、そのインデックスをシャッフルしその配列を返す関数。課題2では、学習データからランダムに100枚を選んで用いたが、課題3では、学習データ全てを重複なく用いるため、この関数を用いて、ループごとにランダムなデータを用いることを実現した。\\\\
-    def get\_shaffled\_index():\\
+    \item get\_shuffled\_index : 学習データ分の長さの、0から始まるインデックスの配列を生成し、そのインデックスをシャッフルしその配列を返す関数。課題2では、学習データからランダムに100枚を選んで用いたが、課題3では、学習データ全てを重複なく用いるため、この関数を用いて、ループごとにランダムなデータを用いることを実現した。\\\\
+    def get\_shuffled\_index():\\
     index = np.arange(len(train\_images)) \# 0から始まるインデックスの配列を作成\\
     np.random.shuffle(index) \# インデックスをシャッフル\\
     return index\\
@@ -72,7 +72,7 @@
     accuracy = np.sum(y\_pred == y\_true) / len(y\_prop)\\
     return accuracy
 \end{itemize}
-今回、中間層の個数は10個、学習率は0.01、エポック数は10、バッチサイズは100としている。for文を用いてループ処理を行い、1エポック毎に(学習データ ÷ バッチサイズ)回のループを更に行っている。1エポック毎の実行の流れとしては、get\_shaffled\_index 関数から出力された配列から先頭の値をバッチサイズ分取り出す。それを用いて、順伝播、クロスエントロピー誤差を計算する。その後、資料の通り実装した逆伝播、パラメータ更新を行う。1エポックにおける学習のループが終了すると、get\_accuracy 関数を用いて正答率を計算し、その結果を配列に保存する。また、平均クロスエントロピー誤差、正答率を標準出力に表示させる。すべてのループが終了すると、matplotlib.pyplot を用いて、それらをプロットしたものを表示する。更新されたパラメータは自動でファイルに保存される。このプログラムの実行時、'ロードしますか？ yes or no:  ' と表示され、yes と入力すると、保存されたパラメータをロードし、それを初期値とする。
+今回、中間層の個数は10個、学習率は0.01、エポック数は10、バッチサイズは100としている。for文を用いてループ処理を行い、1エポック毎に(学習データ ÷ バッチサイズ)回のループを更に行っている。1エポック毎の実行の流れとしては、get\_shuffled\_index 関数から出力された配列から先頭の値をバッチサイズ分取り出す。それを用いて、順伝播、クロスエントロピー誤差を計算する。その後、資料の通り実装した逆伝播、パラメータ更新を行う。1エポックにおける学習のループが終了すると、get\_accuracy 関数を用いて正答率を計算し、その結果を配列に保存する。また、平均クロスエントロピー誤差、正答率を標準出力に表示させる。すべてのループが終了すると、matplotlib.pyplot を用いて、それらをプロットしたものを表示する。更新されたパラメータは自動でファイルに保存される。このプログラムの実行時、'ロードしますか？ yes or no:  ' と表示され、yes と入力すると、保存されたパラメータをロードし、それを初期値とする。
 
 \section{実行結果}
 \begin{verbatim}
@@ -94,7 +94,7 @@
 \end{verbatim}
  \begin{figure}[H]
 		      \begin{center}
-			      \includegraphics[scale=0.3]{noLoaded.jpg}
+			      \includegraphics[scale=0.3]{picture/noLoaded.jpg}
 			      \caption{プロット結果(ロード無し)}
 		      \end{center}
 \end{figure}
@@ -117,7 +117,7 @@
 \end{verbatim}
 \begin{figure}[H]
 		      \begin{center}
-			      \includegraphics[scale=0.3]{./loaded.jpg}
+			      \includegraphics[scale=0.3]{picture/loaded.jpg}
 			      \caption{プロット結果(ロード有り)}
 		      \end{center}
 \end{figure}
@@ -125,7 +125,7 @@
 
 
 \section{工夫点}
-get\_shaffled\_index 関数により出力された配列の先頭から順に値を取り出し、重複なく学習を行えるよう実装したのは工夫した点であるといえる。また、すでに実装していたget\_predicted\_class 関数を再利用し、記述量を削減した。ただ、正答率計算の際、データの形を整え、順伝播を行った出力を関数は入力として受け取るが、そうするのであれば、データと正解ラベルを直接受け取り、正答率計算の関数内で順伝播も行うように実装した方が、より簡潔になったかもしれない。
+get\_shuffled\_index 関数により出力された配列の先頭から順に値を取り出し、重複なく学習を行えるよう実装したのは工夫した点であるといえる。また、すでに実装していたget\_predicted\_class 関数を再利用し、記述量を削減した。ただ、正答率計算の際、データの形を整え、順伝播を行った出力を関数は入力として受け取るが、そうするのであれば、データと正解ラベルを直接受け取り、正答率計算の関数内で順伝播も行うように実装した方が、より簡潔になったかもしれない。
 
 \section{問題点}
 今回のプログラムを実行すると、 RuntimeWarning: overflow encountered in exp return 1 / (1 + np.exp(-x)) という警告文が出てしまった。これは、シグモイド関数の出力に対する警告文である。また、実行結果を見ると、ロードを行った方は、途中で正答率が逆に下がっている部分がある。今回ロードしたパラメータはすでに何回か学習していたものであるので、過学習が起き始めている可能性がある。このプログラムでは、保存するファイル、読み込むファイルが固定されているため、中間層の数や学習率を変化させて学習した場合でもパラメータが更新されてしまう。そのため、ロードするか否かの外部入力だけでなく、ファイルを指定できるようにし、また、パラメータの削除(初期化)まで実装すればさらに良いプログラムになると感じた。
@@ -246,7 +246,7 @@ def calculate_accuracy(images, labels, weight1, bias1, weight2, bias2):
     
  \begin{figure}[H]
 		      \begin{center}
-			      \includegraphics[scale=0.3]{noLoaded-refactored.png}
+			      \includegraphics[scale=0.3]{picture/noLoaded-refactored.png}
 			      \caption{プロット結果(ロード無し、リファクタリング後)}
 		      \end{center}
 \end{figure}
@@ -269,7 +269,7 @@ def calculate_accuracy(images, labels, weight1, bias1, weight2, bias2):
 \end{verbatim}
  \begin{figure}[H]
 		      \begin{center}
-			      \includegraphics[scale=0.3]{loaded-refactored.png}
+			      \includegraphics[scale=0.3]{picture/loaded-refactored.png}
 			      \caption{プロット結果(ロード有り、リファクタリング後)}
 		      \end{center}
 \end{figure}
