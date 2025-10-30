@@ -30,7 +30,7 @@ test_labels  = mnist.parse_idx(gzip.open("all/mnist_data/t10k-labels-idx1-ubyte.
 #     # np.arrangeの生成を省略し、直接データ数からサンプリングする
 #     return np.random.choice(len(train_images), size=batch_size, replace=False)
 
-def get_shaffled_index(arr):
+def get_shuffled_index(arr):
     index_arr = np.arange(len(arr)) # 0から始まるインデックスの配列を作成
     np.random.shuffle(index_arr) # インデックスをシャッフル
     return index_arr
@@ -215,9 +215,8 @@ def calculate_accuracy_for_epoch(images, labels, weight1, bias1, weight2, bias2,
 
     if mode == 'train':
 
-         probabilities, _, _ = forward_propagation_train(images_vector, weight1, bias1, weight2, bias2, ignore_number)
+        probabilities, _, _ = forward_propagation_train(images_vector, weight1, bias1, weight2, bias2, ignore_number)
     elif mode == 'test':
-        # テストデータに対する精度の計算時は、スケーリングを適用したforward_propagation_testを使用
         probabilities, _, _ = forward_propagation_test(images_vector, weight1, bias1, weight2, bias2, ignore_number)
     else:
          # デフォルト
@@ -251,14 +250,15 @@ if __name__ == "__main__":
 
         for i in range(1, epoch_number + 1):
             error_sum = 0
-            shaffled_train_image_index = get_shaffled_index(train_images)
+            train_accuracy_sum = 0
+            shuffled_train_image_index = get_shuffled_index(train_images)
             
-            for j in range(0, len(shaffled_train_image_index), batch_size): # range(start, stop, step) を使い、batch_sizeずつインデックスをずらしながらループ
+            for j in range(0, len(shuffled_train_image_index), batch_size): # range(start, stop, step) を使い、batch_sizeずつインデックスをずらしながらループ
 
                 # hidden_layer_size分のインデックス配列からignore_number個ランダムに選択
                 random_selection = np.random.choice(np.arange(hidden_layer_size), size=ignore_number, replace=False)
                 
-                index = shaffled_train_image_index[j:j + batch_size]    #シャッフルしたインデックスから、先頭のbatch_size分取り出す
+                index = shuffled_train_image_index[j:j + batch_size]    #シャッフルしたインデックスから、先頭のbatch_size分取り出す
 
                 # 統合した関数を使い、ミニバッチと対応ラベルを一度に取得
                 batch_image_vector, batch_labels = get_batch(index)
@@ -279,16 +279,19 @@ if __name__ == "__main__":
                     batch_image_vector, hidden_layer_input, hidden_layer_output, output_probabilities, one_hot_labels,
                     weight1, bias1, weight2, bias2, learning_rate, random_selection
                 )
+                train_accuracy_sum += calculate_accuracy_for_epoch(batch_image_vector, batch_labels, weight1, bias1, weight2, bias2, 'train', random_selection)
+
             ignore_index_for_acc = np.arange(hidden_layer_size)[:ignore_number] 
-            
-            train_accuracy = calculate_accuracy_for_epoch(train_images, train_labels, weight1, bias1, weight2, bias2, 'train', ignore_index_for_acc)
-            
+            test_accuracy = calculate_accuracy_for_epoch(test_images, test_labels, weight1, bias1, weight2, bias2, 'test', ignore_index_for_acc)
+        
             num_batches = len(train_images) // batch_size
             train_loss_list.append(error_sum / num_batches)
-            train_acc_list.append(train_accuracy)
+            train_acc_list.append(train_accuracy_sum/ num_batches)
+            test_acc_list.append(test_accuracy)
             print(f"{i}エポック目")
             print(f"  平均クロスエントロピー誤差: {error_sum / num_batches}")
-            print(f"  学習データに対する正答率: {train_accuracy}")
+            print(f"  学習データに対する正答率: {train_accuracy_sum / num_batches}")
+            print(f"  テストデータに対する正答率: {test_accuracy}")
         
     # --- グラフの描画 ---
         x = np.arange(1, epoch_number + 1)
@@ -305,6 +308,7 @@ if __name__ == "__main__":
         # 正答率のグラフ
         plt.subplot(1, 2, 2)
         plt.plot(x, train_acc_list, marker='o', label='Train Accuracy')
+        plt.plot(x, test_acc_list, marker='s', label='Test Accuracy')
         plt.title('Accuracy')
         plt.xlabel('Epoch')
         plt.ylabel('Accuracy')
@@ -318,7 +322,7 @@ if __name__ == "__main__":
     # テストモードの場合にのみ予測を実行
     elif mode == 'test':
         print("\n--- テストモード実行中 ---")
-        random_selection = np.random.choice(np.arange(batch_size), size=ignore_number, replace=False)
+        random_selection = np.random.choice(np.arange(hidden_layer_size), size=ignore_number, replace=False)
     # テストデータに対する最終的な正答率を計算
         test_accuracy = calculate_accuracy_for_epoch(test_images, test_labels, weight1, bias1, weight2, bias2, 'test', random_selection)
 

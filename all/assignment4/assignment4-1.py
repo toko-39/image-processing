@@ -29,7 +29,7 @@ test_labels  = mnist.parse_idx(gzip.open("all/mnist_data/t10k-labels-idx1-ubyte.
 #     # np.arangeの生成を省略し、直接データ数からサンプリングする
 #     return np.random.choice(len(train_images), size=batch_size, replace=False)
 
-def get_shaffled_index():
+def get_shuffled_index():
     index = np.arange(len(train_images)) # 0から始まるインデックスの配列を作成
     np.random.shuffle(index) # インデックスをシャッフル
     return index
@@ -188,12 +188,12 @@ if __name__ == "__main__":
     for i in range(1, epoch_number + 1):
         error_sum = 0
         train_accuracy_sum = 0
-        shaffled_index = get_shaffled_index()
+        shuffled_index = get_shuffled_index()
         
-        for j in range(0, len(shaffled_index), batch_size): # range(start, stop, step) を使い、batch_sizeずつインデックスをずらしながらループ
+        for j in range(0, len(shuffled_index), batch_size): # range(start, stop, step) を使い、batch_sizeずつインデックスをずらしながらループ
             
             #シャッフルしたインデックスから、先頭のbatch_size分取り出す
-            index = shaffled_index[j:j + batch_size]
+            index = shuffled_index[j:j + batch_size]
 
             # 統合した関数を使い、ミニバッチと対応ラベルを一度に取得
             batch_image_vector, batch_labels = get_batch(index)
@@ -216,7 +216,7 @@ if __name__ == "__main__":
                 weight1, bias1, weight2, bias2, learning_rate
             )
 
-            train_accuracy_sum += calculate_accuracy(train_images, train_labels, weight1, bias1, weight2, bias2)
+            train_accuracy_sum += calculate_accuracy(batch_image_vector, batch_labels, weight1, bias1, weight2, bias2)
         test_accuracy = calculate_accuracy(test_images, test_labels, weight1, bias1, weight2, bias2)
         
         num_batches = len(train_images) // batch_size
