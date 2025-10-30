@@ -234,15 +234,21 @@ if __name__ == "__main__":
     learning_rate = 0.01
     train_loss_list, train_acc_list, test_acc_list = [], [], []
 
-    mode = str(input('実行モードを入力してください (train or test): '))
-    if mode not in ['train', 'test']:
+    while True:
+        mode = str(input('実行モードを入力してください (train or test): '))
+        if mode in ['train', 'test']:
+            break
         print("無効なモードです。'train' または 'test' を入力してください。")
-        exit()
 
-    ignore_number = int(input('Dropoutの個数を 0 ~ 100 で入力してください: '))
-    if not (0 <= ignore_number <= hidden_layer_size):
-        print("無効なドロップアウト数です。0から100の範囲で入力してください。")
-        exit()
+    while True:
+        try:
+            ignore_number = int(input(f'Dropoutの個数を 0 ~ {hidden_layer_size} で入力してください: '))
+            if 0 <= ignore_number <= hidden_layer_size:
+                break
+            else:
+                print(f"無効なドロップアウト数です。0から{hidden_layer_size}の範囲で入力してください。")
+        except ValueError:
+            print("無効な入力です。整数を入力してください。")
 
     # 訓練モードの場合にのみ学習を実行
     if mode == 'train':
