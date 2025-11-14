@@ -79,8 +79,7 @@ def sigmoid(x):
 
 def softmax(x):
     """
-    ソフトマックス関数（オーバーフロー対策版）
-    各要素を0から1の間の確率に変換
+    ソフトマックス関数
     """
     alpha = np.max(x, axis=-1, keepdims=True)
     exp_x = np.exp(x - alpha)

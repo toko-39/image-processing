@@ -105,8 +105,7 @@ def im2col(padding_data, filter_size, stride=1, pad=0):
             col[:, i, j, :, :, :] = padding_data[:, i * stride:i_max, j * stride:j_max, :]
             
     # 形状を (R*R*C, N*out_h*out_w) に変換（行列乗算の形式）
-    # transpose(0, 4, 5, 3, 1, 2) はバッチ, フィルタ幅, フィルタ高, チャンネル, out_h, out_w の順
-    col = col.transpose(0, 4, 5, 3, 1, 2).reshape(N * out_h * out_w, -1).T 
+    col = col.reshape(-1, filter_size * filter_size * C).T
     
     return col
 
@@ -123,7 +122,7 @@ def set_filter_weights():
 
 def set_biases():
     K = 32  # フィルタ枚数
-    b = np.zeros(K)  # バイアスはゼロで初期化
+    b = np.random.normal(loc=0.0, scale=0.01, size=K)
     b_vector = b.reshape(-1, 1) # (K, 1) に整形
     
     return b_vector
@@ -149,17 +148,17 @@ def conv_forward(padded_data, conv_W, conv_b_vector, filter_size, stride=1):
     N, H_prime, W_prime, C = padded_data.shape
     K, _ = conv_W.shape
     
-    # 1. Im2col変換: (N, H', W', C) -> (R*R*C, N*out_h*out_w)
+    # Im2col変換: (N, H', W', C) -> (R*R*C, N*out_h*out_w)
     col = im2col(padded_data, filter_size, stride=stride, pad=0)
     
-    # 2. 行列積による畳み込み計算: Y = WX
+    # 行列積による畳み込み計算: Y = WX
     # W: (K, R*R*C) @ X: (R*R*C, N*out_h*out_w) -> Y: (K, N*out_h*out_w)
     conv_out = np.dot(conv_W, col)
     
-    # 3. バイアスの加算
+    # バイアスの加算
     conv_out += conv_b_vector
     
-    # 4. 出力特徴マップの形状に戻す
+    # 出力特徴マップの形状に戻す
     out_h = (H_prime - filter_size) // stride + 1 
     out_w = (W_prime - filter_size) // stride + 1 
     
@@ -171,28 +170,14 @@ def conv_forward(padded_data, conv_W, conv_b_vector, filter_size, stride=1):
 # 畳み込み層の逆伝播関数
 
 def conv_backward(dY_4d, col):
-    """
-    畳み込み層の逆伝播を計算する関数
-    
-    引数:
-      dY_4d: 上流からの誤差 (N, out_h, out_w, K)
-      conv_W: フィルタ重み (K, R*R*C)
-      col: Im2col変換された入力行列 X (R*R*C, N*out_h*out_w)
-      
-    戻り値:
-      dW: フィルタ重み W の勾配 (K, R*R*C)
-      db_vector: バイアス b の勾配 (K, 1)
-      dX_col: 入力行列 X の勾配 (R*R*C, N*out_h*out_w)
-    """
+
     N, out_h, out_w, K = dY_4d.shape
     
     # dY_4d (N, out_h, out_w, K) を dY (K, N*out_h*out_w) に整形
     dY = dY_4d.transpose(3, 0, 1, 2).reshape(K, N * out_h * out_w)
         
-    # フィルタ重み W の勾配 dW = dY @ X.T
-    dW = np.dot(dY, col.T) # (K, M) @ (M, R*R*C) -> (K, R*R*C)
+    dW = np.dot(dY, col.T) # (K, R*R*C)
     
-    # 3. バイアス b の勾配 db = rowSum(dY)
     db_vector = np.sum(dY, axis=1, keepdims=True) # (K, 1)
     
     return dW, db_vector
@@ -205,7 +190,7 @@ def ReLU(arr):
     return new_arr
 
 def softmax(x):
-    """ソフトマックス関数（オーバーフロー対策版）"""
+    """ソフトマックス関数"""
     alpha = np.max(x, axis=-1, keepdims=True)
     exp_x = np.exp(x - alpha)
     return exp_x / np.sum(exp_x, axis=-1, keepdims=True)
@@ -229,7 +214,7 @@ def forward_propagation(input_data_4d, conv_W, conv_b_vector, conv_R,
     output_layer_input = np.dot(hidden_layer_output, weight2.T) + bias2
     final_output = softmax(output_layer_input)
     
-    return final_output, hidden_layer_input, hidden_layer_output, hidden_layer_output_conv, col
+    return  final_output, hidden_layer_input, hidden_layer_output, conv_output_4d, col
 
 def forward_propagation_train(input_data_4d, conv_W, conv_b_vector, conv_R, 
                               weight1, bias1, weight2, bias2, ignore_number):
@@ -248,7 +233,7 @@ def forward_propagation_train(input_data_4d, conv_W, conv_b_vector, conv_R,
     output_layer_input = np.dot(hidden_layer_output, weight2.T) + bias2
     final_output = softmax(output_layer_input)
     
-    return final_output, hidden_layer_input, hidden_layer_output, hidden_layer_output_conv, col
+    return final_output, hidden_layer_input, hidden_layer_output, conv_output_4d, col
 
 def forward_propagation_test(input_data_4d, conv_W, conv_b_vector, conv_R, 
                              weight1, bias1, weight2, bias2, ignore_number):
@@ -266,7 +251,7 @@ def forward_propagation_test(input_data_4d, conv_W, conv_b_vector, conv_R,
     output_layer_input = np.dot(hidden_layer_output, weight2.T) + bias2
     final_output = softmax(output_layer_input)
     
-    return final_output, hidden_layer_input, hidden_layer_output, hidden_layer_output_conv, None 
+    return final_output, hidden_layer_input, hidden_layer_output, conv_output_4d, None 
 
 def get_predicted_class(output_probabilities):
     if output_probabilities.ndim == 1:
@@ -335,9 +320,9 @@ def backward_propagation_and_update_train(batch_image_vector, hidden_layer_input
     bias2  -= dEn_db_1 * learning_rate
     
     # 畳み込み層へ伝える誤差 dY_conv (4D) を計算
-    # dY_conv は FC層の入力 (batch_image_vector) に対する誤差 dEn_dX_sig を元の4D形状に戻したもの
+    # dY_conv は 全結合層の入力 (batch_image_vector) に対する誤差 dEn_dX_sig を元の4D形状に戻したもの
     N, fc_input_size = batch_image_vector.shape
-    conv_output_h = 32 # 32 * 32 * 32 = 32768
+    conv_output_h = 32
     conv_output_w = 32
     conv_K = 32
     dY_conv_vector = np.dot(dEn_dX_sig, weight1)
@@ -360,13 +345,8 @@ output_layer_size = 10   # CIFAR-10も10クラス
 # --- メイン処理 ---
 if __name__ == "__main__":
     
-    # 畳み込み層のパラメータ設定
-    conv_K = 32 # フィルタ枚数
-    conv_R = 3  # フィルタサイズ
-    conv_W, conv_R = set_filter_weights() # conv_W: (32, 27)
-    conv_b_vector = set_biases() # conv_b_vector: (32, 1)
-    
     # 畳み込み層の出力サイズ計算
+    conv_K = 32 # フィルタ枚数
     conv_output_h = 32 
     conv_output_w = 32
     fc_input_size = conv_output_h * conv_output_w * conv_K # 32 * 32 * 32 = 32768
@@ -383,7 +363,7 @@ if __name__ == "__main__":
     is_load = str(input('ロードしますか？ yes or no: '))
     if is_load == 'yes' :
         # ロード処理 (ファイル名注意)
-        loaded_data = np.load('assignment3_parameter.npz') # ロードするファイル名を修正
+        loaded_data = np.load('assignment5_parameter.npz') # ロードするファイル名を修正
         weight1 = loaded_data['weight1']
         bias1 = loaded_data['bias1']
         weight2 = loaded_data['weight2']
@@ -392,6 +372,9 @@ if __name__ == "__main__":
         conv_b_vector = loaded_data['conv_b_vector']
     else:
         # 重みとバイアスを正規分布で初期化
+        conv_W, conv_R = set_filter_weights() # conv_W: (32, 27) conv_R: 3(フィルタサイズ)
+        conv_b_vector = set_biases() # conv_b_vector: (32, 1)
+        
         # 第1層（畳み込み層 -> 中間層）
         weight1 = np.random.normal(loc=0.0, scale=np.sqrt(1 / fc_input_size), size=(hidden_layer_size, fc_input_size))  # (100, 32768)
         bias1 = np.zeros((hidden_layer_size,))  # (100,)
@@ -432,7 +415,7 @@ if __name__ == "__main__":
                 batch_image, batch_labels = get_batch(index)
                 
                 # --- 順伝播 ---
-                output_probabilities, hidden_layer_input, hidden_layer_output, conv_output_relu, train_images_col = forward_propagation_train(
+                output_probabilities, hidden_layer_input, hidden_layer_output, conv_output_pre_relu, train_images_col = forward_propagation_train(
                     batch_image, conv_W, conv_b_vector, conv_R, 
                     weight1, bias1, weight2, bias2, random_selection
                 )
@@ -442,19 +425,24 @@ if __name__ == "__main__":
                 error_sum += calculated_error
                 
                 # --- 逆伝播 ---
-                # 1. 全結合層への入力ベクトルを生成 (100, 32768)
+                # 全結合層への入力ベクトルを生成 (100, 32768)
+                conv_output_relu = ReLU(conv_output_pre_relu)
                 batch_image_vector_for_fc = conv_output_relu.reshape(batch_image.shape[0], -1)
 
-                # 2. FC層の逆伝播と更新。Conv層へ伝播させる誤差 dY_conv_4d を取得
+                # 全結合層の逆伝播と更新。Conv層へ伝播させる誤差 dY_conv_4d を取得
                 weight1, bias1, weight2, bias2, prev_delta_W1, prev_delta_W2, dY_conv_4d = backward_propagation_and_update_train(
                     batch_image_vector_for_fc, 
                     hidden_layer_input, hidden_layer_output, output_probabilities, one_hot_labels,
                     weight1, bias1, weight2, bias2, learning_rate, random_selection, momentum, prev_delta_W1, prev_delta_W2
                 )
                 
-                # 3. Conv層の逆伝播と更新
+                # Conv層の逆伝播と更新
+                relu_diff_conv = np.where(conv_output_pre_relu > 0, 1, 0)
+
+                dY_conv_4d *= relu_diff_conv
+                
                 # train_images_col は順伝播で得られた im2col の結果 (X)
-                dW, db_vector = conv_backward(dY_conv_4d, conv_W, train_images_col)
+                dW, db_vector = conv_backward(dY_conv_4d, train_images_col)
                 
                 # パラメータ更新
                 conv_W -= dW * learning_rate
@@ -510,7 +498,7 @@ if __name__ == "__main__":
         plt.show()
         
         # パラメータの保存
-        np.savez('assignment3_parameter.npz', weight1 = weight1, bias1 = bias1, weight2 = weight2, bias2 = bias2, conv_W = conv_W, conv_b_vector = conv_b_vector)
+        np.savez('assignment5_parameter.npz', weight1 = weight1, bias1 = bias1, weight2 = weight2, bias2 = bias2, conv_W = conv_W, conv_b_vector = conv_b_vector)
 
     # テストモードの場合にのみ予測を実行
     elif mode == 'test':
