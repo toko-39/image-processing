@@ -84,7 +84,7 @@ def ReLU(arr):
 
 def softmax(x):
     """
-    ソフトマックス関数（オーバーフロー対策版）
+    ソフトマックス関数
     各要素を0から1の間の確率に変換
     """
     alpha = np.max(x, axis=-1, keepdims=True)
@@ -144,10 +144,10 @@ def backward_propagation_and_update(batch_image_vector, hidden_layer_input, hidd
     dEn_db_1 = np.sum(dEn_dak, axis = 0)
     # dEn_dX_sig = dEn_dX * (hidden_layer_output * (1 - hidden_layer_output))
     differentiated_input = np.where(hidden_layer_input > 0, 1, 0) # ReLUに入力するhidden_input_layerの微分
-    dEn_dX_sig = dEn_dX * differentiated_input
+    dEn_dX_ReLU = dEn_dX * differentiated_input
     
-    dEn_dW_2= np.dot(dEn_dX_sig.T, batch_image_vector)
-    dEn_db_2 = np.sum(dEn_dX_sig, axis=0)
+    dEn_dW_2= np.dot(dEn_dX_ReLU.T, batch_image_vector)
+    dEn_db_2 = np.sum(dEn_dX_ReLU, axis=0)
 
     # --- パラメータ更新 ---
     weight1 -= dEn_dW_2 * learning_rate 

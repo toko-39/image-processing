@@ -367,7 +367,7 @@ if __name__ == "__main__":
     is_load = str(input('ロードしますか？ yes or no: '))
     if is_load == 'yes' :
         # ロード処理 (ファイル名注意)
-        loaded_data = np.load('assignment5_parameter.npz') # ファイル名を修正
+        loaded_data = np.load('assignment_cnn_one_fc_parameter.npz') # ファイル名を修正
         weight2 = loaded_data['weight2']
         bias2 = loaded_data['bias2']
         conv_W = loaded_data['conv_W']
@@ -496,7 +496,7 @@ if __name__ == "__main__":
         plt.show()
         
         # パラメータの保存
-        np.savez('assignment5_parameter.npz', weight2 = weight2, bias2 = bias2, conv_W = conv_W, conv_b_vector = conv_b_vector)
+        np.savez('assignment_cnn_one_fc_parameter.npz', weight2 = weight2, bias2 = bias2, conv_W = conv_W, conv_b_vector = conv_b_vector)
 
     # テストモードの場合にのみ予測を実行
     elif mode == 'test':

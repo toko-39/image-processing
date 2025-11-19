@@ -108,7 +108,7 @@ def im2col(padding_data, filter_size, stride=1, pad=0):
             col[:, i, j, :, :, :] = padding_data[:, i * stride:i_max, j * stride:j_max, :]
             
     # 形状を (R*R*C, N*out_h*out_w) に変換（行列乗算の形式）
-    col = col.col.reshape(-1, filter_size * filter_size * C).T
+    col = col.reshape(-1, filter_size * filter_size * C).T
     
     return col
 
@@ -171,7 +171,6 @@ def conv_forward(padded_data, conv_W, conv_b_vector, filter_size, stride=1):
     return output, col
 
 # 畳み込み層の逆伝播関数
-
 def conv_backward(dY_4d, col):
 
     N, out_h, out_w, K = dY_4d.shape
@@ -185,6 +184,23 @@ def conv_backward(dY_4d, col):
     
     return dW, db_vector
 
+np.random.seed(777) 
+
+def ReLU(arr):
+    """ReLU活性化関数"""
+    new_arr = np.where(arr > 0, arr, 0)
+    return new_arr
+
+def softmax(x):
+    """ソフトマックス関数"""
+    alpha = np.max(x, axis=-1, keepdims=True)
+    exp_x = np.exp(x - alpha)
+    return exp_x / np.sum(exp_x, axis=-1, keepdims=True)
+
+# -------------------------------------------------------------
+# 🌟 Max Pooling 層の追加
+# -------------------------------------------------------------
+
 def max_pooling_forward(conv_output_4d, pool_h=POOL_SIZE, pool_w=POOL_SIZE, stride=POOL_STRIDE):
 
     N, H, W, C = conv_output_4d.shape
@@ -192,6 +208,7 @@ def max_pooling_forward(conv_output_4d, pool_h=POOL_SIZE, pool_w=POOL_SIZE, stri
     out_w = (W - pool_w) // stride + 1
 
     # 領域を抽出 (N, out_h, out_w, pool_h, pool_w, C)
+    # im2col と同様の処理でパッチを抽出
     col = np.zeros((N, out_h, out_w, pool_h, pool_w, C))
 
     for i in range(out_h):
@@ -200,11 +217,12 @@ def max_pooling_forward(conv_output_4d, pool_h=POOL_SIZE, pool_w=POOL_SIZE, stri
             j_max = j * stride + pool_w
             col[:, i, j, :, :, :] = conv_output_4d[:, i * stride:i_max, j * stride:j_max, :]
             
-    col = col.reshape(-1, pool_h * pool_w, C)
+    # 最大値を計算するために整形 (N*out_h*out_w, pool_h*pool_w, C)
+    col_max_calc = col.reshape(N * out_h * out_w, pool_h * pool_w, C)
     
     # 最大値とインデックスを取得
-    out_flat = np.max(col, axis=1)    # (N*out_h*out_w, C)
-    max_idx = np.argmax(col, axis=1) # (N*out_h*out_w, C)
+    out_flat = np.max(col_max_calc, axis=1)    # (N*out_h*out_w, C)
+    max_idx = np.argmax(col_max_calc, axis=1)  # (N*out_h*out_w, C)
 
     # 出力形状に戻す (N, out_h, out_w, C)
     out = out_flat.reshape(N, out_h, out_w, C)
@@ -220,19 +238,24 @@ def max_pooling_backward(dY, max_idx, input_shape, pool_h=POOL_SIZE, pool_w=POOL
     # dYを (N*out_h*out_w, C) に再整形
     dY_flat = dY.reshape(-1, C)
 
-    # dXをIm2colの形状 (N*out_h*out_w, pool_h*pool_w*C) で初期化するための準備
-    dX_col_flat = np.zeros((dY_flat.shape[0] * C, pool_h * pool_w))
+    # dXをIm2colの形状 (N*out_h*out_w, pool_h*pool_w, C) で初期化
+    dX_col = np.zeros((dY_flat.shape[0], pool_h * pool_w, C))
     
-    # dY_flat_c: (N*out_h*out_w * C) - 順伝播で通った経路の勾配
-    dY_flat_c = dY_flat.ravel()
-    # max_idx_c: (N*out_h*out_w * C) - 最大値の位置 (0 ~ 3)
-    max_idx_c = max_idx.ravel()
+    # max_idx (N*out_h*out_w, C)
+    # dY_flat (N*out_h*out_w, C)
     
-    # 勾配を最大値の位置に配置
-    dX_col_flat[np.arange(dY_flat_c.shape[0]), max_idx_c] = dY_flat_c
+    # 勾配 dY_flat を最大値の位置 (max_idx) に配置
+    # np.arange(dY_flat.shape[0])[:, None] で (N*out_h*out_w, 1) のインデックスを作成
+    # np.arange(C)[None, :] で (1, C) のインデックスを作成
+    # これらを組み合わせて dX_col[行インデックス, 列インデックス, チャンネルインデックス] = 値 の形式で代入
+    
+    idx_flat = np.arange(dY_flat.shape[0])[:, None]
+    
+    # dX_col[行インデックス, 縦横インデックス, チャンネルインデックス] = 値
+    dX_col[idx_flat, max_idx, np.arange(C)[None, :]] = dY_flat
     
     # dX_colを (N, out_h, out_w, pool_h, pool_w, C) の形状に戻す
-    dX_col = dX_col_flat.reshape(N, out_h, out_w, pool_h, pool_w, C)
+    dX_col = dX_col.reshape(N, out_h, out_w, pool_h, pool_w, C)
     
     # dXを (N, H, W, C) に再構成 (Col2imの逆操作)
     dX = np.zeros(input_shape)
@@ -246,105 +269,81 @@ def max_pooling_backward(dY, max_idx, input_shape, pool_h=POOL_SIZE, pool_w=POOL
     
     return dX
 
-np.random.seed(777) 
+# -------------------------------------------------------------
+# 🌟 順伝播関数の修正 (Conv → MaxPool → ReLU → FC → Softmax)
+# -------------------------------------------------------------
 
-def ReLU(arr):
-    """課題4-1 ReLU活性化関数"""
-    new_arr = np.where(arr > 0, arr, 0)
-    return new_arr
-
-def softmax(x):
-    """ソフトマックス関数"""
-    alpha = np.max(x, axis=-1, keepdims=True)
-    exp_x = np.exp(x - alpha)
-    return exp_x / np.sum(exp_x, axis=-1, keepdims=True)
-
-# --- 順伝播の実行 ---
-def forward_propagation(input_data_4d, conv_W, conv_b_vector, conv_R, 
-                         weight1, bias1, weight2, bias2):
-    """畳み込み層 -> Max Pooling -> ReLU-> 全結合層の順伝播"""
+def forward_propagation(input_data_4d, conv_W, conv_b_vector, conv_R, weight2, bias2):
+    """畳み込み層 -> Max Pooling -> ReLU -> 全結合層2 -> Softmax の順伝播"""
     
     # 畳み込み層
-    conv_output_4d, col = conv_forward(input_data_4d, conv_W, conv_b_vector, conv_R, stride=1) 
+    conv_output_pre_relu, col = conv_forward(input_data_4d, conv_W, conv_b_vector, conv_R, stride=1) 
     
     # Max Pooling層
-    pool_output, pool_mask, pool_input_shape = max_pooling_forward(conv_output_4d)
+    pool_output, pool_mask, pool_input_shape = max_pooling_forward(conv_output_pre_relu)
     
-    # Conv-ReLU
+    # ReLU
     relu_conv_output = ReLU(pool_output)
     
     # 全結合層への入力のために平坦化
     input_vector_fc = relu_conv_output.reshape(relu_conv_output.shape[0], -1) 
     
-    # 全結合層1 + ReLU
-    hidden_layer_input = np.dot(input_vector_fc, weight1.T) + bias1 
-    hidden_layer_output = ReLU(hidden_layer_input)
-    
-    # 全結合層2 + Softmax
-    output_layer_input = np.dot(hidden_layer_output, weight2.T) + bias2
+    # 全結合層 (元の weight2 が使用される)
+    output_layer_input = np.dot(input_vector_fc, weight2.T) + bias2
     final_output = softmax(output_layer_input)
     
-    # Max Poolingの順伝播情報を追加で返す (テスト時には使用されないが、統一のため)
-    return final_output, hidden_layer_input, hidden_layer_output, conv_output_4d, col, pool_mask, pool_input_shape, input_vector_fc, pool_output
+    # 逆伝播に必要な情報をまとめて返す (ここではテスト用の最低限)
+    return final_output, input_vector_fc, conv_output_pre_relu, col, pool_mask, pool_input_shape, pool_output
 
-def forward_propagation_train(input_data_4d, conv_W, conv_b_vector, conv_R, 
-                              weight1, bias1, weight2, bias2, ignore_number):
+def forward_propagation_train(input_data_4d, conv_W, conv_b_vector, conv_R, weight2, bias2, ignore_number):
     
     # 畳み込み層
-    conv_output_4d, col = conv_forward(input_data_4d, conv_W, conv_b_vector, conv_R, stride=1) 
+    conv_output_pre_relu, col = conv_forward(input_data_4d, conv_W, conv_b_vector, conv_R, stride=1) 
     
     # Max Pooling層
-    pool_output, pool_mask, pool_input_shape = max_pooling_forward(conv_output_4d)
+    pool_output, pool_mask, pool_input_shape = max_pooling_forward(conv_output_pre_relu)
     
-    # Conv-ReLU
+    # ReLU
     relu_conv_output = ReLU(pool_output)
     
     # 全結合層への入力のために平坦化
     input_vector_fc = relu_conv_output.reshape(relu_conv_output.shape[0], -1) 
     
-    # 全結合層1 + ReLU
-    hidden_layer_input = np.dot(input_vector_fc, weight1.T) + bias1
-    hidden_layer_output = ReLU(hidden_layer_input)
-    
-    # ドロップアウト適用
+    # ドロップアウト適用 (全結合層への入力に適用)
+    hidden_layer_output = input_vector_fc.copy() # FC層の入力が隠れ層の出力に相当する
     for index in ignore_number:
         hidden_layer_output[:, index] = 0
         
-    # 全結合層2 + Softmax
+    # 全結合層
     output_layer_input = np.dot(hidden_layer_output, weight2.T) + bias2
     final_output = softmax(output_layer_input)
     
     # 逆伝播に必要な情報を全て返す
-    return final_output, hidden_layer_input, hidden_layer_output, conv_output_4d, col, pool_mask, pool_input_shape, input_vector_fc, pool_output
+    return final_output, hidden_layer_output, conv_output_pre_relu, col, pool_mask, pool_input_shape, pool_output
 
-def forward_propagation_test(input_data_4d, conv_W, conv_b_vector, conv_R, 
-                             weight1, bias1, weight2, bias2, ignore_number):
+def forward_propagation_test(input_data_4d, conv_W, conv_b_vector, conv_R, weight2, bias2, ignore_number):
     
     # 畳み込み層
-    conv_output_4d, col = conv_forward(input_data_4d, conv_W, conv_b_vector, conv_R, stride=1) 
+    conv_output_pre_relu, col = conv_forward(input_data_4d, conv_W, conv_b_vector, conv_R, stride=1) 
     
     # Max Pooling層
-    pool_output, pool_mask, pool_input_shape = max_pooling_forward(conv_output_4d)
+    pool_output, pool_mask, pool_input_shape = max_pooling_forward(conv_output_pre_relu)
     
-    # Conv-ReLU
+    # ReLU
     relu_conv_output = ReLU(pool_output)
     
     # 全結合層への入力のために平坦化
     input_vector_fc = relu_conv_output.reshape(relu_conv_output.shape[0], -1) 
     
-    # 全結合層1 + ReLU
-    hidden_layer_input = np.dot(input_vector_fc, weight1.T) + bias1
-    hidden_layer_output = ReLU(hidden_layer_input)
+    # ドロップアウトのスケーリング適用 (全結合層の入力に適用)
+    hidden_layer_output = input_vector_fc * (1 - (len(ignore_number) / fc_input_size)) # hidden_layer_size -> fc_input_size
     
-    # ドロップアウトのスケーリング適用
-    hidden_layer_output *= 1 - (len(ignore_number) / hidden_layer_size)
-    
-    # 全結合層2 + Softmax
+    # 全結合層
     output_layer_input = np.dot(hidden_layer_output, weight2.T) + bias2
     final_output = softmax(output_layer_input)
     
     # テスト時は逆伝播情報が不要なので、ダミーを返す
-    return final_output, hidden_layer_input, hidden_layer_output, None, None, None, None, None, None
+    return final_output, hidden_layer_output, None, None, None, None, None
 
 def get_predicted_class(output_probabilities):
     if output_probabilities.ndim == 1:
@@ -364,72 +363,74 @@ def get_accuracy(y_prop, y_true):
     accuracy = np.sum(y_pred == y_true) / len(y_prop)
     return accuracy
 
-def calculate_accuracy_for_epoch(images, labels, conv_W, conv_b_vector, conv_R, weight1, bias1, weight2, bias2, mode, ignore_number):
+def calculate_accuracy_for_epoch(images, labels, conv_W, conv_b_vector, conv_R, weight2, bias2, mode, ignore_number):
     """
     指定されたデータセットに対するモデルの正答率を計算する関数。
     """
     if mode == 'train':
-        probabilities, _, _, _, _, _, _, _, _ = forward_propagation_train(images, conv_W, conv_b_vector, conv_R, weight1, bias1, weight2, bias2, ignore_number)
+        probabilities, _, _, _, _, _, _ = forward_propagation_train(images, conv_W, conv_b_vector, conv_R, weight2, bias2, ignore_number)
     elif mode == 'test':
-        probabilities, _, _, _, _, _, _, _, _ = forward_propagation_test(images, conv_W, conv_b_vector, conv_R, weight1, bias1, weight2, bias2, ignore_number)
+        probabilities, _, _, _, _, _, _ = forward_propagation_test(images, conv_W, conv_b_vector, conv_R, weight2, bias2, ignore_number)
     else:
-        probabilities, _, _, _, _, _, _, _, _ = forward_propagation(images, conv_W, conv_b_vector, conv_R, weight1, bias1, weight2, bias2)
+        probabilities, _, _, _, _, _, _ = forward_propagation(images, conv_W, conv_b_vector, conv_R, weight2, bias2)
 
     accuracy = get_accuracy(probabilities, labels)
 
     return accuracy
 
-# --- 全結合層の逆伝播と更新 ---
-def backward_propagation_and_update_train(input_vector_fc, hidden_layer_input, hidden_layer_output, output_probabilities, one_hot_labels, 
-                                          weight1, bias1, weight2, bias2, learning_rate, ignore_number, momentum, prev_delta_W1, prev_delta_W2,
-                                          conv_output_4d, pool_mask, pool_input_shape, pool_output):
+# -------------------------------------------------------------
+# 🌟 逆伝播関数の修正 (全結合層は1つ)
+# -------------------------------------------------------------
+
+def backward_propagation_and_update_train(hidden_layer_output, output_probabilities, one_hot_labels, 
+                                          weight2, bias2, learning_rate, ignore_number, momentum, prev_delta_W2,
+                                          conv_output_pre_relu, col, pool_mask, pool_input_shape, pool_output):
     """
     全結合層の逆伝播、パラメータ更新、および勾配計算後の畳み込み層への誤差伝播を行う。
     """
-    current_batch_size = input_vector_fc.shape[0]
+    current_batch_size = hidden_layer_output.shape[0]
     
-    # --- 全結合層の逆伝播 ---
-    dEn_dak = (output_probabilities - one_hot_labels) / current_batch_size
+    # --- 全結合層 (weight2) の逆伝播 ---
+    # 誤差 dEn_dak は Softmax の後の勾配
+    dEn_dak = (output_probabilities - one_hot_labels) / current_batch_size  # (N, Output_K)
     
-    dEn_dX = np.dot(dEn_dak, weight2)
-    dEn_dW_1 = np.dot(dEn_dak.T, hidden_layer_output)
-    dEn_db_1 = np.sum(dEn_dak, axis = 0)
-    
-    differentiated_input = np.where(hidden_layer_input > 0, 1, 0) # ReLUに入力するhidden_input_layerの微分
-    
+    # 全結合層の勾配計算
+    dEn_dW2 = np.dot(dEn_dak.T, hidden_layer_output)  # (Output_K, FC_Input_Size)
+    dEn_db2 = np.sum(dEn_dak, axis=0)                # (Output_K,)
+
+    # 誤差を全結合層の入力 (hidden_layer_output) に逆伝播
+    dEn_dX_pool = np.dot(dEn_dak, weight2)          # (N, FC_Input_Size)
+
+    # ドロップアウト層の逆伝播
+    # hidden_layer_outputはドロップアウト適用済みなので、伝播される誤差もドロップアウトされた場所はゼロ
     for index in ignore_number:
-        dEn_dX[:, index] = 0 # ドロップアウトされたノードの誤差をゼロにする
-        differentiated_input[:, index] = 0 
-        
-    dEn_dX_sig = dEn_dX * differentiated_input 
-    
-    dEn_dW_2 = np.dot(dEn_dX_sig.T, input_vector_fc) # input_vector_fc は Pooling層の出力
-    dEn_db_2 = np.sum(dEn_dX_sig, axis=0)
+         dEn_dX_pool[:, index] = 0
     
     # --- パラメータ更新 ---
-    delta_W1 = momentum * prev_delta_W1 - dEn_dW_2 * learning_rate 
-    delta_W2 = momentum * prev_delta_W2 - dEn_dW_1 * learning_rate 
+    delta_W2 = momentum * prev_delta_W2 - dEn_dW2 * learning_rate 
     
-    weight1 += delta_W1
-    bias1 -= dEn_db_2 * learning_rate
     weight2 += delta_W2
-    bias2 -= dEn_db_1 * learning_rate
+    bias2 -= dEn_db2 * learning_rate
     
     # --- 畳み込み層へ伝える誤差 dY_conv_4d を計算 ---
     
     N = current_batch_size
-    H_pool = 16 
-    W_pool = 16
-    K_conv = 32
     
-    # dEn_dX_sig は 全結合1の入力 (Pooling層の出力) に対する勾配
-    dPool_output = dEn_dX_sig.reshape(N, H_pool, W_pool, K_conv)
+    # メイン処理で定義された定数を使用
+    pool_output_h = 16 
+    pool_output_w = 16
+    conv_K = 32
     
+    # dEn_dX_pool (N, FC_Input_Size) を 4次元に戻す (MaxPoolの出力に対する勾配)
+    dPool_output = dEn_dX_pool.reshape(N, pool_output_h, pool_output_w, conv_K)
+    
+    # ReLU層の逆伝播
     dRelu_input = dPool_output * np.where(pool_output > 0, 1, 0)
     
+    # Max Pooling層の逆伝播 (最終的に Conv 層の出力に対する勾配 dY_conv_4d を得る)
     dY_conv_4d = max_pooling_backward(dRelu_input, pool_mask, pool_input_shape)
 
-    return weight1, bias1, weight2, bias2, delta_W1, delta_W2, dY_conv_4d
+    return weight2, bias2, delta_W2, dY_conv_4d
 
 
 # --- メイン処理で使用するグローバルデータ読み込み ---
@@ -439,13 +440,13 @@ train_images, train_labels, test_images, test_labels = load_cifar10(data_dir)
 padded_train_images, padded_test_images = padding_data(train_images, test_images, pad=1)
 
 # レイヤーの次元数を修正（CIFAR-10用）
-input_size = 3072  # 32x32x3（カラー画像）
-hidden_layer_size = 100  # 中間層は同じ
-output_layer_size = 10   # CIFAR-10も10クラス
+# input_size = 3072  # 32x32x3（カラー画像）
+# hidden_layer_size = 100  # 中間層は不要だが、ドロップアウトの入力サイズとして利用
+output_layer_size = 10 # CIFAR-10も10クラス
 
 # --- メイン処理 ---
 if __name__ == "__main__":
-        
+    
     # 畳み込み層の出力サイズ計算
     conv_K = 32 # フィルタ枚数
     conv_output_h = 32 
@@ -454,21 +455,22 @@ if __name__ == "__main__":
     pool_output_w = (conv_output_w - POOL_SIZE) // POOL_STRIDE + 1 # 16
     fc_input_size = pool_output_h * pool_output_w * conv_K # 16 * 16 * 32 = 8192
     
+    # ドロップアウトのサイズとしてfc_input_sizeを使用
+    hidden_layer_size = fc_input_size 
+    
     batch_size = 100
     epoch_number = 10
     learning_rate = 0.01
     train_loss_list, train_acc_list, test_acc_list = [], [], []
     momentum = 0.9
-    prev_delta_W1 = 0
-    prev_delta_W2 = 0
-
+    
+    # weight1, prev_delta_W1 は不要になったため、weight2, prev_delta_W2 のみ使用
+    prev_delta_W2 = 0 
 
     is_load = str(input('ロードしますか？ yes or no: '))
     if is_load == 'yes' :
         # ロード処理 (ファイル名注意)
         loaded_data = np.load('assignment6_parameter.npz')
-        weight1 = loaded_data['weight1']
-        bias1 = loaded_data['bias1']
         weight2 = loaded_data['weight2']
         bias2 = loaded_data['bias2']
         conv_W = loaded_data['conv_W']
@@ -478,12 +480,9 @@ if __name__ == "__main__":
         conv_W, conv_R = set_filter_weights() # conv_W: (32, 27) conv_R: 3(フィルタサイズ)
         conv_b_vector = set_biases() # conv_b_vector: (32, 1)
         
-        # 第1層（畳み込み層 -> 中間層）
-        weight1 = np.random.normal(loc=0.0, scale=np.sqrt(1 / fc_input_size), size=(hidden_layer_size, fc_input_size))  # (100, 32768)
-        bias1 = np.zeros((hidden_layer_size,))  # (100,)
-        # 第2層（中間層 -> 出力層）
-        weight2 = np.random.normal(loc=0.0, scale=np.sqrt(1 / hidden_layer_size), size=(output_layer_size, hidden_layer_size)) # (10,100)
-        bias2 = np.random.normal(loc=0.0, scale=np.sqrt(1 / hidden_layer_size), size=output_layer_size) # (10,)
+        # 全結合層（中間層 -> 出力層だったものが、Conv出力 -> 出力層に変更）
+        weight2 = np.random.normal(loc=0.0, scale=np.sqrt(1 / fc_input_size), size=(output_layer_size, fc_input_size)) # (10, 8192)
+        bias2 = np.random.normal(loc=0.0, scale=np.sqrt(1 / fc_input_size), size=output_layer_size) # (10,)
 
     while True:
         mode = str(input('実行モードを入力してください (train or test): '))
@@ -493,11 +492,12 @@ if __name__ == "__main__":
 
     while True:
         try:
-            ignore_number = int(input(f'Dropoutの個数を 0 ~ {hidden_layer_size} で入力してください: '))
-            if 0 <= ignore_number <= hidden_layer_size:
+            # ドロップアウトの個数を fc_input_size (8192) の範囲で入力
+            ignore_number = int(input(f'Dropoutの個数を 0 ~ {fc_input_size} で入力してください: '))
+            if 0 <= ignore_number <= fc_input_size:
                 break
             else:
-                print(f"無効なドロップアウト数です。0から{hidden_layer_size}の範囲で入力してください。")
+                print(f"無効なドロップアウト数です。0から{fc_input_size}の範囲で入力してください。")
         except ValueError:
             print("無効な入力です。整数を入力してください。")
 
@@ -512,49 +512,65 @@ if __name__ == "__main__":
             
             for j in range(0, len(shuffled_train_image_index), batch_size): 
 
-                random_selection = np.random.choice(np.arange(hidden_layer_size), size=ignore_number, replace=False)
+                # ドロップアウト対象のインデックスを FC_Input_Size (8192) の範囲で選択
+                random_selection = np.random.choice(np.arange(fc_input_size), size=ignore_number, replace=False)
                 index = shuffled_train_image_index[j:j + batch_size] 
 
-                padded_train_images, train_labels = get_batch(index)
+                batch_image, batch_labels = get_batch(index) # ★バッチデータを取得し、グローバル変数の上書きを防ぐため変数名を修正
                 
                 # --- 順伝播 ---
-                output_probabilities, hidden_layer_input, hidden_layer_output, conv_output_4d, train_images_col, pool_mask, pool_input_shape, input_vector_fc, pool_output = forward_propagation_train(
-                    padded_train_images, conv_W, conv_b_vector, conv_R, 
-                    weight1, bias1, weight2, bias2, random_selection
+                output_probabilities, hidden_layer_output, conv_output_pre_relu, train_images_col, pool_mask, pool_input_shape, pool_output = forward_propagation_train(
+                    batch_image, conv_W, conv_b_vector, conv_R, 
+                    weight2, bias2, random_selection
                 )
                 
-                one_hot_labels = get_one_hot_label(train_labels, output_layer_size)
+                one_hot_labels = get_one_hot_label(batch_labels, output_layer_size)
                 calculated_error = get_cross_entropy_error(output_probabilities, one_hot_labels)
                 error_sum += calculated_error
                 
                 # --- 逆伝播 ---
-                weight1, bias1, weight2, bias2, prev_delta_W1, prev_delta_W2, dY_conv_4d = backward_propagation_and_update_train(
-                    input_vector_fc, 
-                    hidden_layer_input, hidden_layer_output, output_probabilities, one_hot_labels,
-                    weight1, bias1, weight2, bias2, learning_rate, random_selection, momentum, prev_delta_W1, prev_delta_W2,
-                    conv_output_4d, pool_mask, pool_input_shape, pool_output
+                # 全結合層の逆伝播と更新。Conv層へ伝播させる誤差 dY_conv_4d を取得
+                weight2, bias2, prev_delta_W2, dY_conv_4d = backward_propagation_and_update_train(
+                    hidden_layer_output, # ドロップアウト適用済みの FC 層への入力 (N, FC_Input_Size)
+                    output_probabilities, one_hot_labels,
+                    weight2, bias2, learning_rate, random_selection, momentum, prev_delta_W2,
+                    conv_output_pre_relu, train_images_col, pool_mask, pool_input_shape, pool_output
                 )
                 
-                # 全結合層の逆伝播と更新
+                # Conv層の逆伝播と更新
+                
+                # Max Pooling の逆伝播で得られた勾配 dY_conv_4d は Conv の出力に対する勾配
+                # これに Conv 後の活性化関数 (ReLU) の微分をかける必要がある
+                
+                # (Max Poolingの後にReLUがあるため、Conv の出力 pre-ReLU の勾配を求める必要がある)
+                # Max Pooling の入力は Conv の出力 pre-ReLU ではないため、dY_conv_4d は Conv の出力 pre-ReLU の勾配として使用する
+                
+                # ここでは、簡略化のため、Conv の出力 pre-ReLU の勾配として扱う
+                
+                # Conv-ReLU の逆伝播 (ReLU(MaxPool) の前の層)
+                # dY_conv_4d は MaxPool_Backward の出力であり、Conv 層の出力に対する勾配 (dLoss/dConv_Out) に相当する
+                relu_diff_conv = np.where(conv_output_pre_relu > 0, 1, 0)
+                dY_conv_4d *= relu_diff_conv
+                
                 # train_images_col は順伝播で得られた im2col の結果 (X)
                 dW, db_vector = conv_backward(dY_conv_4d, train_images_col)
                 
                 # パラメータ更新
                 conv_W -= dW * learning_rate
-                conv_b_vector -= db_vector * learning_rate
+                conv_b_vector -= db_vector * learning_rate # db_vectorは(32,1)なのでそのまま減算
                 
                 
                 train_accuracy_sum += calculate_accuracy_for_epoch(
-                    padded_train_images, train_labels, conv_W, conv_b_vector, conv_R, 
-                    weight1, bias1, weight2, bias2, 'train', random_selection
+                    batch_image, batch_labels, conv_W, conv_b_vector, conv_R, 
+                    weight2, bias2, 'train', random_selection
                 )
             
             # テストデータに対する精度計算
-            ignore_index_for_acc = np.arange(hidden_layer_size)[:ignore_number] 
+            ignore_index_for_acc = np.arange(fc_input_size)[:ignore_number] 
             
             test_accuracy = calculate_accuracy_for_epoch(
                 padded_test_images, test_labels, conv_W, conv_b_vector, conv_R,
-                weight1, bias1, weight2, bias2, 'test', ignore_index_for_acc
+                weight2, bias2, 'test', ignore_index_for_acc
             )
             
             num_batches = len(train_images) // batch_size
@@ -593,17 +609,17 @@ if __name__ == "__main__":
         plt.show()
         
         # パラメータの保存
-        np.savez('assignment6_parameter.npz', weight1 = weight1, bias1 = bias1, weight2 = weight2, bias2 = bias2, conv_W = conv_W, conv_b_vector = conv_b_vector)
+        np.savez('assignment6_parameter.npz', weight2 = weight2, bias2 = bias2, conv_W = conv_W, conv_b_vector = conv_b_vector)
 
     # テストモードの場合にのみ予測を実行
     elif mode == 'test':
-        print("\n--- テストモード実行中  ---")
-        random_selection = np.random.choice(np.arange(hidden_layer_size), size=ignore_number, replace=False)
+        print("\n--- テストモード実行中  ---")
+        random_selection = np.random.choice(np.arange(fc_input_size), size=ignore_number, replace=False) # ドロップアウトのサイズを fc_input_size に修正
         
         # テストデータに対する最終的な正答率を計算
         test_accuracy = calculate_accuracy_for_epoch(
             padded_test_images, test_labels, conv_W, conv_b_vector, conv_R,
-            weight1, bias1, weight2, bias2, 'test', random_selection
+            weight2, bias2, 'test', random_selection
         )
         
         print(f"\nテストデータに対する最終正答率: {test_accuracy}")
