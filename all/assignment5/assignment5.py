@@ -194,10 +194,6 @@ def softmax(x):
     exp_x = np.exp(x - alpha)
     return exp_x / np.sum(exp_x, axis=-1, keepdims=True)
 
-# -------------------------------------------------------------
-# 🌟 順伝播関数の修正 (Conv → ReLU → FC → Softmax)
-# -------------------------------------------------------------
-
 def forward_propagation_train(input_data_4d, conv_W, conv_b_vector, conv_R, weight2, bias2, ignore_number):
     
     # 畳み込み層
@@ -209,7 +205,7 @@ def forward_propagation_train(input_data_4d, conv_W, conv_b_vector, conv_R, weig
     # 全結合層への入力のために平坦化
     input_vector_fc = hidden_layer_output_conv.reshape(hidden_layer_output_conv.shape[0], -1) 
     
-    # ドロップアウト適用 (FC層への入力に適用)
+    # ドロップアウト適用 
     hidden_layer_output = input_vector_fc.copy()
     for index in ignore_number:
         hidden_layer_output[:, index] = 0
@@ -218,7 +214,7 @@ def forward_propagation_train(input_data_4d, conv_W, conv_b_vector, conv_R, weig
     output_layer_input = np.dot(hidden_layer_output, weight2.T) + bias2
     final_output = softmax(output_layer_input)
     
-    # 逆伝播に必要な情報を返す（hidden_layer_inputは不要なので削除）
+    # 逆伝播に必要な情報を返す
     return final_output, hidden_layer_output, conv_output_pre_relu, col
 
 def forward_propagation_test(input_data_4d, conv_W, conv_b_vector, conv_R, weight2, bias2, ignore_number):
@@ -232,7 +228,6 @@ def forward_propagation_test(input_data_4d, conv_W, conv_b_vector, conv_R, weigh
     # 全結合層への入力のために平坦化
     input_vector_fc = hidden_layer_output_conv.reshape(hidden_layer_output_conv.shape[0], -1) 
     
-    # ドロップアウトのスケーリング適用
     hidden_layer_output = input_vector_fc * (1 - (len(ignore_number) / fc_input_size)) 
     
     # 全結合層
@@ -260,7 +255,6 @@ def get_accuracy(y_prop, y_true):
     accuracy = np.sum(y_pred == y_true) / len(y_prop)
     return accuracy
 
-# 修正: weight1/bias1の引数を削除
 def calculate_accuracy_for_epoch(images, labels, conv_W, conv_b_vector, conv_R, weight2, bias2, mode, ignore_number):
     """
     指定されたデータセットに対するモデルの正答率を計算する関数。
@@ -269,23 +263,12 @@ def calculate_accuracy_for_epoch(images, labels, conv_W, conv_b_vector, conv_R, 
         probabilities, _, _, _ = forward_propagation_train(images, conv_W, conv_b_vector, conv_R, weight2, bias2, ignore_number)
     elif mode == 'test':
         probabilities, _, _, _ = forward_propagation_test(images, conv_W, conv_b_vector, conv_R, weight2, bias2, ignore_number)
-    else:
-        # 簡易フォワードパス（未使用）
-        conv_output_pre_relu, col = conv_forward(images, conv_W, conv_b_vector, conv_R, stride=1) 
-        hidden_layer_output = ReLU(conv_output_pre_relu).reshape(images.shape[0], -1) 
-        output_layer_input = np.dot(hidden_layer_output, weight2.T) + bias2
-        probabilities = softmax(output_layer_input)
-
 
     accuracy = get_accuracy(probabilities, labels)
 
     return accuracy
 
-# -------------------------------------------------------------
-# 🌟 逆伝播関数の修正 (全結合層は1つ)
-# -------------------------------------------------------------
 
-# 修正: weight1, bias1, prev_delta_W1, prev_delta_W2を削除/修正
 def backward_propagation_and_update_train(hidden_layer_output, output_probabilities, one_hot_labels, 
                                           weight2, bias2, learning_rate, ignore_number, momentum, prev_delta_W2,
                                           conv_output_pre_relu, train_images_col):
@@ -298,7 +281,7 @@ def backward_propagation_and_update_train(hidden_layer_output, output_probabilit
     # 誤差 dEn_dak は Softmax の後の勾配
     dEn_dak = (output_probabilities - one_hot_labels) / current_batch_size  # (N, Output_K)
     
-    # FC層の勾配計算
+    # 全結合層の勾配計算
     dEn_dW_2 = np.dot(dEn_dak.T, hidden_layer_output)  # (Output_K, FC_Input_Size)
     dEn_db_2 = np.sum(dEn_dak, axis=0)                # (Output_K,)
 
@@ -306,8 +289,6 @@ def backward_propagation_and_update_train(hidden_layer_output, output_probabilit
     dY_conv_vector = np.dot(dEn_dak, weight2)          # (N, FC_Input_Size)
 
     # ドロップアウト層の逆伝播
-    # hidden_layer_outputはドロップアウト適用済みの入力値。
-    # ここで hidden_layer_output (FC入力) の微分を計算するが、ドロップアウト適用済みのノードはゼロになるように修正
     for index in ignore_number:
          dY_conv_vector[:, index] = 0
     
@@ -361,13 +342,12 @@ if __name__ == "__main__":
     train_loss_list, train_acc_list, test_acc_list = [], [], []
     momentum = 0.9
     
-    # weight1, prev_delta_W1 は不要になったため、weight2, prev_delta_W2 のみ使用
     prev_delta_W2 = 0 
 
     is_load = str(input('ロードしますか？ yes or no: '))
     if is_load == 'yes' :
         # ロード処理 (ファイル名注意)
-        loaded_data = np.load('assignment5_parameter.npz') # ファイル名を修正
+        loaded_data = np.load('assignment5_parameter.npz')
         weight2 = loaded_data['weight2']
         bias2 = loaded_data['bias2']
         conv_W = loaded_data['conv_W']
@@ -409,14 +389,13 @@ if __name__ == "__main__":
             
             for j in range(0, len(shuffled_train_image_index), batch_size): 
 
-                # ドロップアウト対象のインデックスを FC_Input_Size (32768) の範囲で選択
+                # ドロップアウト対象のインデックスを fc_input_size (32768) の範囲で選択
                 random_selection = np.random.choice(np.arange(fc_input_size), size=ignore_number, replace=False)
                 index = shuffled_train_image_index[j:j + batch_size] 
 
                 batch_image, batch_labels = get_batch(index)
                 
                 # --- 順伝播 ---
-                # weight1, bias1を削除
                 output_probabilities, hidden_layer_output, conv_output_pre_relu, train_images_col = forward_propagation_train(
                     batch_image, conv_W, conv_b_vector, conv_R, 
                     weight2, bias2, random_selection
@@ -427,9 +406,8 @@ if __name__ == "__main__":
                 error_sum += calculated_error
                 
                 # --- 逆伝播 ---
-                # weight1, bias1, prev_delta_W1 を削除し、prev_delta_W2のみを使用
                 weight2, bias2, prev_delta_W2, dY_conv_4d = backward_propagation_and_update_train(
-                    hidden_layer_output, # ドロップアウト適用済みの FC 層への入力 (N, FC_Input_Size)
+                    hidden_layer_output, # ドロップアウト適用済みの全結合層への入力 (N, fc_input_size)
                     output_probabilities, one_hot_labels,
                     weight2, bias2, learning_rate, random_selection, momentum, prev_delta_W2,
                     conv_output_pre_relu, train_images_col
@@ -445,7 +423,6 @@ if __name__ == "__main__":
                 conv_b_vector -= db_vector * learning_rate 
                 
                 
-                # weight1, bias1を削除
                 train_accuracy_sum += calculate_accuracy_for_epoch(
                     batch_image, batch_labels, conv_W, conv_b_vector, conv_R, 
                     weight2, bias2, 'train', random_selection
@@ -454,7 +431,6 @@ if __name__ == "__main__":
             # テストデータに対する精度計算
             ignore_index_for_acc = np.arange(fc_input_size)[:ignore_number] 
             
-            # weight1, bias1を削除
             test_accuracy = calculate_accuracy_for_epoch(
                 padded_test_images, test_labels, conv_W, conv_b_vector, conv_R,
                 weight2, bias2, 'test', ignore_index_for_acc
@@ -504,7 +480,6 @@ if __name__ == "__main__":
         random_selection = np.random.choice(np.arange(fc_input_size), size=ignore_number, replace=False)
         
         # テストデータに対する最終的な正答率を計算
-        # weight1, bias1を削除
         test_accuracy = calculate_accuracy_for_epoch(
             padded_test_images, test_labels, conv_W, conv_b_vector, conv_R,
             weight2, bias2, 'test', random_selection
